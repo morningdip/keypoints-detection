@@ -713,3 +713,28 @@ def save_keypoints(image, savename, boxes, keypoints, class_ids, class_names, sk
                     result_image, (joint[0], joint[1]), 7, color[idx], -1)
 
     cv2.imwrite('{}'.format(savename), result_image.astype(np.uint8))
+
+
+def get_keypoints_image(frame, boxes, keypoints, class_ids, class_names, scores=None):
+    result_image = frame.astype(np.float32).copy()
+    result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
+
+    N = boxes.shape[0]
+
+    color = [(244, 108, 4), (67, 67, 244), (8, 228, 252)]
+
+    if not N:
+        print('\n*** No keypoints to display *** \n')
+    else:
+        assert boxes.shape[0] == keypoints.shape[0] == class_ids.shape[0]
+
+    for i in range(N):
+        y1, x1, y2, x2 = boxes[i]
+        # cv2.rectangle(result_image, (x1, y1), (x2, y2), (244, 108, 4), 3)
+
+        for idx, joint in enumerate(keypoints[i]):
+            if(joint[2] != 0):
+                cv2.circle(
+                    result_image, (joint[0], joint[1]), 7, color[idx], -1)
+
+    return result_image.astype(np.uint8)
