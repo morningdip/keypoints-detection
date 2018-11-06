@@ -6,11 +6,13 @@ import pandas as pd
 import utils
 import model as modellib
 import visualize
+import progressbar
 import terminal_color as tc
 from config import Config
 from model import log
 from PIL import Image
 from keras import backend as K
+from progressbar import AnimatedMarker, Bar, ETA, Percentage, SimpleProgress
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -22,10 +24,12 @@ fi_class_names = ['finger']
 class_names = ['fingertip', 'joint1', 'joint2']
 index = [0, 1, 2]
 
+widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', AnimatedMarker(markers='◢◣◤◥'), ' ', Bar(marker='>'), ' ', ETA()]
+
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs/{}_logs".format(fi_class_names[0]))
 model_path = os.path.join(
-    ROOT_DIR, "model/mask_rcnn_{}_0300.h5".format(fi_class_names[0]))
+    ROOT_DIR, "model/mask_rcnn_{}.h5".format(fi_class_names[0]))
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -115,12 +119,14 @@ if __name__ == '__main__':
     print('Loading weights from ', model_path)
     model.load_weights(model_path, by_name=True)
 
-    for x in range(0, dataset_test.num_images):
+    for x in progressbar.progressbar(range(0, dataset_test.num_images), widgets=widgets, redirect_stdout=True):
         image = dataset_test.load_image(x)
         category = dataset_test.image_info[x]['image_category']
         image_id = dataset_test.image_info[x]['id']
         image_name, image_ext = os.path.splitext(
             os.path.basename(dataset_test.image_info[x]['id']))
+
+        # print(, '- 0.13 seconds')
 
         null_image = np.zeros((1, 1, 3))
         results = model.detect_keypoint([null_image], verbose=0)
@@ -128,7 +134,7 @@ if __name__ == '__main__':
         start_time = time.time()
         results = model.detect_keypoint([image], verbose=0)
         end_time = time.time()
-        tcolor.printmc(('RED', 'GREEN'), os.path.basename(dataset_test.image_info[x]['id']) + ': ', end_time - start_time)
+        print('test')
 
         r = results[0]
 
@@ -145,5 +151,7 @@ if __name__ == '__main__':
             image, save_img_path,
             r['rois'], r['keypoints'], r['class_ids'],
             dataset_test.class_names)
+
+        pass
 
     K.clear_session()
