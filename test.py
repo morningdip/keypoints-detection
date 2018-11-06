@@ -21,8 +21,8 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 ROOT_DIR = '../'
 
 fi_class_names = ['finger']
-class_names = ['fingertip', 'joint1', 'joint2']
-index = [0, 1, 2]
+class_names = ['fingertip', 'joint']
+index = [0, 1]
 
 widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', AnimatedMarker(markers='◢◣◤◥'), ' ', Bar(marker='>'), ' ', ETA()]
 

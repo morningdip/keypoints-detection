@@ -592,8 +592,8 @@ def get_keypoints(img_category):
     """Get the COCO keypoints and their left/right flip coorespondence map."""
     # Keypoints are not available in the COCO json for the test split, so we
     # provide them here.
-    fi_class_names_ = ['fingertip', 'joint1', 'joint2']
-    finger_index = [0, 1, 2]
+    fi_class_names_ = ['fingertip', 'joint']
+    finger_index = [0, 1]
 
     all_index = {'finger': finger_index}
 

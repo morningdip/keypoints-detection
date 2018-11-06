@@ -8,7 +8,7 @@ save_name = 'images_scaling'
 annotations_save_path = os.path.join(data_path, 'annotations')
 save_path = os.path.join(data_path, save_name)
 
-fi_class_names_ = ['fingertip', 'joint1', 'joint2']
+fi_class_names_ = ['fingertip', 'joint']
 csv_all = []
 
 annotations = pd.read_csv('../data/train/annotations/train.csv')

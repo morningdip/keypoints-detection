@@ -28,8 +28,8 @@ SELF_MODEL_PATH = os.path.join(
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, 'model/mask_rcnn_coco.h5')
 
 # Numbers of keypoints
-class_names = ['fingertip', 'joint1', 'joint2']
-index = [0, 1, 2]
+class_names = ['fingertip', 'joint']
+index = [0, 1]
 
 
 class FingerConfig(Config):
