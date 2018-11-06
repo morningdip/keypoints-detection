@@ -2,6 +2,11 @@ import cv2
 import pandas as pd
 import os
 import numpy as np
+import progressbar
+
+from progressbar import AnimatedMarker, Bar, ETA, Percentage, SimpleProgress
+
+widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', AnimatedMarker(markers='◢◣◤◥'), ' ', Bar(marker='>'), ' ', ETA()]
 
 data_path = '../data/train/'
 save_name = 'images_scaling'
@@ -27,10 +32,9 @@ def keypoint_to_str(keypoint):
     return list_keypoint
 
 
-for x in range(annotations.shape[0]):
+for x in progressbar.progressbar(range(0, annotations.shape[0]), widgets=widgets, redirect_stdout=True):
     id = annotations.loc[x, 'image_id']
     category = annotations.loc[x, 'image_category']
-    print('loading image:%d/%d' % (x, annotations.shape[0]))
     im_path = os.path.join(data_path, id)
 
     key_points = []
@@ -59,5 +63,5 @@ for x in range(annotations.shape[0]):
 
 columns = ['image_id', 'image_category']
 columns.extend(fi_class_names_)
-point_to_csv = pd.DataFrame(data=np.array(csv_all).reshape([-1, 5]), columns=columns)
+point_to_csv = pd.DataFrame(data=np.array(csv_all).reshape([-1, 4]), columns=columns)
 point_to_csv.to_csv(annotations_save_path + '/data_scaling.csv', index=False)
