@@ -1522,7 +1522,7 @@ def build_fpn_mask_graph(rois, feature_maps, image_shape, pool_size, num_classes
     return x
 
 
-def build_fpn_keypoint_graph(rois, feature_maps, image_shape, pool_size, num_keypoints):
+def build_fpn_keypoint_graph(rois, feature_maps, image_shape, pool_size, num_keypoints, backbone, train_bn):
     """Builds the computation graph of the keypoint head of Feature Pyramid Network.
 
     rois: [batch, num_rois, (y1, x1, y2, x2)] Proposal boxes in normalized
@@ -1539,24 +1539,27 @@ def build_fpn_keypoint_graph(rois, feature_maps, image_shape, pool_size, num_key
 
     # ROI Pooling
     # Shape: [batch, num_rois, pool_height, pool_width, channels]
-    x = PyramidROIAlign([pool_size, pool_size], image_shape,
-                        name="roi_align_keypoint_mask")([rois] + feature_maps)
-    for i in range(8):
-        x = KL.TimeDistributed(KL.Conv2D(512, (3, 3), padding="same"),
-                               name="mrcnn_keypoint_mask_conv{}".format(i + 1))(x)
+    assert backbone in ['resnet50', 'resnet101', 'mobilenetv1', 'mobilenetv2']
 
-        x = KL.TimeDistributed(BatchNorm(axis=3),
-                               name='mrcnn_keypoint_mask_bn{}'.format(i + 1))(x)
-        x = KL.Activation('relu')(x)
+    x = PyramidROIAlign(
+        [pool_size, pool_size], image_shape, name="roi_align_keypoint_mask")([rois] + feature_maps)
 
-    x = KL.TimeDistributed(KL.Conv2DTranspose(num_keypoints, (2, 2), strides=2),
-                           name="mrcnn_keypoint_mask_deconv")(x)
-    x = KL.TimeDistributed(
-        KL.Lambda(lambda z: tf.image.resize_bilinear(z, [28, 28])), name="mrcnn_keypoint_mask_upsample_1")(x)
+    if backbone in ['resnet50', 'resnet101']:
+        for i in range(8):
+            x = KL.TimeDistributed(KL.Conv2D(512, (3, 3), padding="same"), name="mrcnn_keypoint_mask_conv{}".format(i + 1))(x)
+            x = KL.TimeDistributed(BatchNorm(axis=3), name='mrcnn_keypoint_mask_bn{}'.format(i + 1))(x)
+            x = KL.Activation('relu')(x)
+    if backbone in ['mobilenetv1', 'mobilenetv2']:
+        x = _timedistributed_depthwise_conv_block(x, 256, block_id=1, train_bn=train_bn)
+        x = _timedistributed_depthwise_conv_block(x, 256, block_id=2, train_bn=train_bn)
+        x = _timedistributed_depthwise_conv_block(x, 256, block_id=3, train_bn=train_bn)
+        x = _timedistributed_depthwise_conv_block(x, 256, block_id=4, train_bn=train_bn)
+
+    x = KL.TimeDistributed(KL.Conv2DTranspose(num_keypoints, (2, 2), strides=2), name="mrcnn_keypoint_mask_deconv")(x)
+    x = KL.TimeDistributed(KL.Lambda(lambda z: tf.image.resize_bilinear(z, [28, 28])), name="mrcnn_keypoint_mask_upsample_1")(x)
 
     # shape: batch_size, num_roi, 56, 56, num_keypoint
-    x = KL.TimeDistributed(
-        KL.Lambda(lambda z: tf.image.resize_bilinear(z, [56, 56])), name="mrcnn_keypoint_mask_upsample_2")(x)
+    x = KL.TimeDistributed(KL.Lambda(lambda z: tf.image.resize_bilinear(z, [56, 56])), name="mrcnn_keypoint_mask_upsample_2")(x)
     # shape: batch_size, num_roi, num_keypoint, 56, 56
     x = KL.TimeDistributed(KL.Lambda(lambda x: tf.transpose(x, [0, 3, 1, 2])), name="mrcnn_keypoint_mask_transpose")(x)
     s = K.int_shape(x)
@@ -2384,9 +2387,10 @@ def data_generator_keypoint(dataset, config, shuffle=True, augment=True, random_
 
     # Anchors
     # [anchor_count, (y1, x1, y2, x2)]
+    backbone_shapes = compute_backbone_shapes(config, config.IMAGE_SHAPE)
     anchors = utils.generate_pyramid_anchors(config.RPN_ANCHOR_SCALES,
                                              config.RPN_ANCHOR_RATIOS,
-                                             config.BACKBONE_SHAPES,
+                                             backbone_shapes,
                                              config.BACKBONE_STRIDES,
                                              config.RPN_ANCHOR_STRIDE)
 
@@ -2867,7 +2871,9 @@ class MaskRCNN():
                 rois, mrcnn_feature_maps,
                 config.IMAGE_SHAPE,
                 config.KEYPOINT_MASK_POOL_SIZE,
-                config.NUM_KEYPOINTS)
+                config.NUM_KEYPOINTS,
+                config.BACKBONE,
+                train_bn=config.TRAIN_BN)
 
             # TODO: clean up (use tf.identify if necessary)
             output_rois = KL.Lambda(lambda x: x * 1, name="output_rois")(rois)
@@ -2927,7 +2933,9 @@ class MaskRCNN():
                 detection_boxes, mrcnn_feature_maps,
                 config.IMAGE_SHAPE,
                 config.KEYPOINT_MASK_POOL_SIZE,
-                config.NUM_KEYPOINTS)
+                config.NUM_KEYPOINTS,
+                config.BACKBONE,
+                train_bn=config.TRAIN_BN)
 
             keypoint_mcrcnn_prob = KL.Activation("softmax", name="mrcnn_prob")(keypoint_mrcnn)
             model = KM.Model([input_image, input_image_meta],
@@ -3045,9 +3053,9 @@ class MaskRCNN():
                                         md5_hash='f313cee49f5d33dfb06f2b255c4adb64')
         else:
             if self.config.BACKBONE == 'mobilenetv1':
-                TF_WEIGHTS_PATH  = 'https://github.com/fchollet/deep-learning-models/'\
-                                         'releases/download/v0.6/'\
-                                         'mobilenet_1_0_224_tf.h5'
+                TF_WEIGHTS_PATH = 'https://github.com/fchollet/deep-learning-models/'\
+                                  'releases/download/v0.6/'\
+                                  'mobilenet_1_0_224_tf.h5'
                 weights_path = get_file('mobilenet_1_0_224_tf.h5',
                                         TF_WEIGHTS_PATH,
                                         cache_subdir='models',

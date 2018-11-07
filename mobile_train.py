@@ -8,7 +8,7 @@ import utils
 from PIL import Image
 from keras.backend.tensorflow_backend import set_session
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 
 gpu_options = tf.GPUOptions(allow_growth=True)
@@ -50,12 +50,19 @@ class FingerConfig(Config):
 
     RPN_TRAIN_ANCHORS_PER_IMAGE = 150
     VALIDATION_STPES = 50
-    STEPS_PER_EPOCH = 10000
+    STEPS_PER_EPOCH = 1000
     MINI_MASK_SHAPE = (56, 56)
     KEYPOINT_MASK_POOL_SIZE = 7
 
+    # Pooled ROIs
+    POOL_SIZE = 7
+    MASK_POOL_SIZE = 14
+    MASK_SHAPE = [28, 28]
     WEIGHT_LOSS = True
     KEYPOINT_THRESHOLD = 0.005
+    # Maximum number of ground truth instances to use in one image
+    MAX_GT_INSTANCES = 128
+    DETECTION_MAX_INSTANCES = 1
     # Maximum number of ground truth instances to use in one image
 
 
@@ -84,7 +91,7 @@ class FingerDataset(utils.Dataset):
             data_path = '../data/train/'
             annotations = pd.read_csv('../data/train/annotations/train.csv')
             annotations = annotations.append(pd.read_csv('../data/train/annotations/data_scaling.csv'), ignore_index=True)
-            annotations = annotations.append(pd.read_csv('../data/train/annotations/data_flip.csv'), ignore_index=True)
+            # annotations = annotations.append(pd.read_csv('../data/train/annotations/data_flip.csv'), ignore_index=True)
         elif category == 'val':
             data_path = '../data/val/'
             annotations = pd.read_csv('../data/val/test.csv')

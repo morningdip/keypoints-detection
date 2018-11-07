@@ -22,15 +22,15 @@ os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 ROOT_DIR = '../'
 
 fi_class_names = ['finger']
-class_names = ['fingertip', 'joint1', 'joint2']
-index = [0, 1, 2]
+class_names = ['fingertip', 'joint']
+index = [0, 1]
 
 widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', AnimatedMarker(markers='◢◣◤◥'), ' ', Bar(marker='>'), ' ', ETA()]
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs/{}_logs".format(fi_class_names[0]))
 model_path = os.path.join(
-    ROOT_DIR, "model/mask_rcnn_{}.h5".format(fi_class_names[0]))
+    ROOT_DIR, "model/mask_rcnn_{}_0242.h5".format(fi_class_names[0]))
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -80,7 +80,7 @@ if __name__ == '__main__':
     null_image = np.zeros((1, 1, 3))
     results = model.detect_keypoint([null_image], verbose=0)
 
-    stream = cv2.VideoCapture('http://140.115.54.125:5566/videostream.cgi?.mjpg')
+    stream = cv2.VideoCapture('http://140.115.54.125:8090/videostream.cgi?.mjpg')
     while True:
         # Capture frame-by-frame
         grabbed, frame = stream.read()

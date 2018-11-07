@@ -29,7 +29,7 @@ widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs/{}_logs".format(fi_class_names[0]))
 model_path = os.path.join(
-    ROOT_DIR, "model/mask_rcnn_{}_0265.h5".format(fi_class_names[0]))
+    ROOT_DIR, "model/mobile_mask_rcnn_{}_0026.h5".format(fi_class_names[0]))
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -45,8 +45,9 @@ def pic_height_width(filepath):
 
 
 class FingerConfig(Config):
+    IMAGE_CATEGORY = fi_class_names[0]
     # Give the configuration a recognizable name
-    NAME = "finger"
+    NAME = 'finger'
 
     # Train on 1 GPU and 8 images per GPU. We can put multiple images on each
     # GPU because the images are small. Batch size is 8 (GPUs * images/GPU).
@@ -55,7 +56,9 @@ class FingerConfig(Config):
     NUM_KEYPOINTS = len(index)
     KEYPOINT_MASK_SHAPE = [56, 56]
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 1  # background + 24 key_point
+    NUM_CLASSES = 1 + 1  # background + keypoint
+
+    BACKBONE = 'mobilenetv1'
 
     RPN_TRAIN_ANCHORS_PER_IMAGE = 150
     VALIDATION_STPES = 100
