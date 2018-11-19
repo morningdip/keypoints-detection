@@ -20,6 +20,7 @@ from matplotlib.patches import Polygon
 import IPython.display
 import cv2
 import utils
+from collections import deque
 
 
 ############################################################
@@ -694,8 +695,6 @@ def save_keypoints(image, savename, boxes, keypoints, class_ids, class_names, sk
     result_image = image.astype(np.float32).copy()
     result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
 
-    N = boxes.shape[0]
-
     color = [(244, 108, 4), (67, 67, 244), (8, 228, 252)]
 
     if not N:
@@ -740,3 +739,31 @@ def get_keypoints_image(frame, boxes, keypoints, class_ids, class_names, scores=
                     result_image, (joint[0], joint[1]), 3, color[idx], -1)
 
     return result_image.astype(np.uint8)
+
+
+pts = deque(maxlen=120)
+
+
+def get_keypoints_trace(image, savename, boxes, keypoints, class_ids, class_names, skeleton=None, scores=None, title="", figsize=(16, 16), ax=None):
+
+    result_image = image.astype(np.float32).copy()
+    result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
+
+    N = boxes.shape[0]
+
+    color = [(244, 108, 4), (67, 67, 244), (8, 228, 252)]
+
+    if not N:
+        print('\n*** No keypoints to display *** \n')
+    else:
+        assert boxes.shape[0] == keypoints.shape[0] == class_ids.shape[0]
+
+    x, y, vis = keypoints[0][0]
+    pts.appendleft((x, y))
+    for i in range(1, len(pts)):
+        if pts[i - 1] is None or pts[i] is None:
+            continue
+        thickness = int(np.sqrt(64 / float(i + 1)) * 2.5)
+        cv2.line(result_image, pts[i - 1], pts[i], color[0], thickness)
+
+    cv2.imwrite('{}'.format(savename), result_image.astype(np.uint8))

@@ -159,7 +159,7 @@ if __name__ == '__main__':
 
         save_img_path = os.path.join(results_path, image_name + '.png')
 
-        visualize.save_keypoints(
+        visualize.get_keypoints_trace(
             image, save_img_path,
             r['rois'], r['keypoints'], r['class_ids'],
             dataset_test.class_names)
