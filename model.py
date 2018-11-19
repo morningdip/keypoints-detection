@@ -315,11 +315,11 @@ def _depthwise_conv_block(inputs, pointwise_conv_filters, alpha,
     # Depthwise
     x = KL.DepthwiseConv2D(
         (3, 3), padding='same', depth_multiplier=depth_multiplier, strides=strides, use_bias=False, name='conv_dw_{}'.format(block_id))(inputs)
-    x = BatchNorm(axis=channel_axis, name='conv_dw_{}_bn'.format(block_id))(x, training=train_bn)
+    x = BatchNorm(axis=3, name='conv_dw_{}_bn'.format(block_id))(x, training=train_bn)
     x = KL.Activation(relu6, name='conv_dw_{}_relu'.format(block_id))(x)
     # Pointwise
     x = KL.Conv2D(pointwise_conv_filters, (1, 1), padding='same', use_bias=False, strides=(1, 1), name='conv_pw_{}'.format(block_id))(x)
-    x = BatchNorm(axis=channel_axis, name='conv_pw_{}_bn'.format(block_id))(x, training=train_bn)
+    x = BatchNorm(axis=3, name='conv_pw_{}_bn'.format(block_id))(x, training=train_bn)
     return KL.Activation(relu6, name='conv_pw_{}_relu'.format(block_id))(x)
 
 
@@ -396,12 +396,12 @@ def _bottleneck(inputs, filters, kernel, t, s, r=False, alpha=1.0, block_id=1, t
 
     x = KL.DepthwiseConv2D(
         kernel, strides=(s, s), depth_multiplier=1, padding='same', name='conv_dw_{}'.format(block_id))(x)
-    x = BatchNorm(axis=channel_axis, name='conv_dw_{}_bn'.format(block_id))(x, training=train_bn)
+    x = BatchNorm(axis=3, name='conv_dw_{}_bn'.format(block_id))(x, training=train_bn)
     x = KL.Activation(relu6, name='conv_dw_{}_relu'.format(block_id))(x)
 
     x = KL.Conv2D(
         filters, (1, 1), strides=(1, 1), padding='same', name='conv_pw_{}'.format(block_id))(x)
-    x = BatchNorm(axis=channel_axis, name='conv_pw_{}_bn'.format(block_id))(x, training=train_bn)
+    x = BatchNorm(axis=3, name='conv_pw_{}_bn'.format(block_id))(x, training=train_bn)
 
     if r:
         x = KL.add([x, inputs], name='res{}'.format(block_id))
@@ -1462,18 +1462,18 @@ def _timedistributed_depthwise_conv_block(inputs, pointwise_conv_filters, stride
     but with each layer wrapped in a TimeDistributed layer,
     used to build the computation graph of the mask head of the FPN.
     """
-    channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
+    # channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
 
     # Depthwise
     x = KL.TimeDistributed(
-        KL.DepthwiseConv2D((3, 3), padding='same', depth_multiplier=1, strides=strides, use_bias=False), name='mrcnn_mask_conv_dw_{}'.format(block_id))(inputs)
-    x = KL.TimeDistributed(BatchNorm(axis=channel_axis), name='mrcnn_mask_conv_dw_{}_bn'.format(block_id))(x, training=train_bn)
+        KL.DepthwiseConv2D((3, 3), padding='same'), name='mrcnn_keypoint_mask_conv{}'.format(block_id))(inputs)
+    x = KL.TimeDistributed(BatchNorm(axis=3), name='mrcnn_keypoint_mask_bn{}'.format(block_id))(x, training=train_bn)
     x = KL.Activation(relu6, name='mrcnn_mask_conv_dw_{}_relu'.format(block_id))(x)
     # Pointwise
     x = KL.TimeDistributed(
-        KL.Conv2D(pointwise_conv_filters, (1, 1), padding='same', use_bias=False, strides=(1, 1)), name='mrcnn_mask_conv_pw_{}'.format(block_id))(x)
-    x = KL.TimeDistributed(BatchNorm(axis=channel_axis), name='mrcnn_mask_conv_pw_{}_bn'.format(block_id))(x, training=train_bn)
-    return KL.Activation(relu6, name='mrcnn_mask_conv_pw_{}_relu'.format(block_id))(x)
+        KL.Conv2D(pointwise_conv_filters, (1, 1), padding='same'), name='mrcnn_keypoint_mask_conv_pw_{}'.format(block_id))(x)
+    x = KL.TimeDistributed(BatchNorm(axis=3), name='mrcnn_keypoint_mask_conv_pw_bn{}'.format(block_id))(x, training=train_bn)
+    return KL.Activation(relu6, name='mrcnn_mask_conv_pw_relu{}'.format(block_id))(x)
 
 
 def build_fpn_mask_graph(rois, feature_maps, image_shape, pool_size, num_classes, backbone, train_bn):
@@ -1544,16 +1544,10 @@ def build_fpn_keypoint_graph(rois, feature_maps, image_shape, pool_size, num_key
     x = PyramidROIAlign(
         [pool_size, pool_size], image_shape, name="roi_align_keypoint_mask")([rois] + feature_maps)
 
-    if backbone in ['resnet50', 'resnet101']:
-        for i in range(8):
-            x = KL.TimeDistributed(KL.Conv2D(512, (3, 3), padding="same"), name="mrcnn_keypoint_mask_conv{}".format(i + 1))(x)
-            x = KL.TimeDistributed(BatchNorm(axis=3), name='mrcnn_keypoint_mask_bn{}'.format(i + 1))(x)
-            x = KL.Activation('relu')(x)
-    if backbone in ['mobilenetv1', 'mobilenetv2']:
-        x = _timedistributed_depthwise_conv_block(x, 256, block_id=1, train_bn=train_bn)
-        x = _timedistributed_depthwise_conv_block(x, 256, block_id=2, train_bn=train_bn)
-        x = _timedistributed_depthwise_conv_block(x, 256, block_id=3, train_bn=train_bn)
-        x = _timedistributed_depthwise_conv_block(x, 256, block_id=4, train_bn=train_bn)
+    for i in range(8):
+        x = KL.TimeDistributed(KL.Conv2D(512, (3, 3), padding="same"), name="mrcnn_keypoint_mask_conv{}".format(i + 1))(x)
+        x = KL.TimeDistributed(BatchNorm(axis=3), name='mrcnn_keypoint_mask_bn{}'.format(i + 1))(x)
+        x = KL.Activation('relu')(x)
 
     x = KL.TimeDistributed(KL.Conv2DTranspose(num_keypoints, (2, 2), strides=2), name="mrcnn_keypoint_mask_deconv")(x)
     x = KL.TimeDistributed(KL.Lambda(lambda z: tf.image.resize_bilinear(z, [28, 28])), name="mrcnn_keypoint_mask_upsample_1")(x)
@@ -2773,7 +2767,7 @@ class MaskRCNN():
         # Returns a list of the last layers of each stage, 5 in total.
         # Don't create the thead (stage 5), so we pick the 4th item in the list.
         if config.BACKBONE in ['resnet50', 'resnet101']:
-            _, C2, C3, C4, C5 = resnet_graph(input_image, 'resnet101', stage5=True)
+            _, C2, C3, C4, C5 = resnet_graph(input_image, config.BACKBONE, stage5=True)
         elif config.BACKBONE in ['mobilenetv1']:
             _, C2, C3, C4, C5 = mobilenetv1_graph(input_image, config.BACKBONE, alpha=1.0)
         elif config.BACKBONE in ["mobilenetv2"]:
@@ -3471,7 +3465,7 @@ class MaskRCNN():
         assert self.mode == "inference", "Create model in inference mode."
         assert len(images) == self.config.BATCH_SIZE, "len(images) must be equal to BATCH_SIZE"
 
-        #self.keras_model.summary()
+        # self.keras_model.summary()
 
         if verbose:
             log("Processing {} images".format(len(images)))
@@ -3663,7 +3657,8 @@ def mold_image(images, config):
     colors in RGB order.
     """
     if config.BACKBONE in ['mobilenetv1', 'mobilenetv2']:
-        return images.astype(np.float32) / 127.5 - 1.0
+        #return images.astype(np.float32) / 127.5 - 1.0
+        return images.astype(np.float32) - config.MEAN_PIXEL
     if config.BACKBONE in ['resnet50', 'resnet101']:
         return images.astype(np.float32) - config.MEAN_PIXEL
 
@@ -3671,7 +3666,8 @@ def mold_image(images, config):
 def unmold_image(normalized_images, config):
     """Takes a image normalized with mold() and returns the original."""
     if config.BACKBONE in ['mobilenetv1', 'mobilenetv2']:
-        return ((normalized_images + 1) * 127.5).astype(np.uint8)
+        #return ((normalized_images + 1) * 127.5).astype(np.uint8)
+        return (normalized_images + config.MEAN_PIXEL).astype(np.uint8)
     if config.BACKBONE in ['resnet50', 'resnet101']:
         return (normalized_images + config.MEAN_PIXEL).astype(np.uint8)
 

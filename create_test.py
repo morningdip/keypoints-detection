@@ -2,11 +2,10 @@ import os
 import csv
 from natsort import natsorted
 
-json_folfer = '../data/val/images'
-output_folder = '../data/val/annotations/test.csv'
+json_folfer = '../data/test2/images'
+output_folder = '../data/test2/annotations/test2.csv'
 
-ext_name = '.jpg'
-test_files = [img for img in os.listdir(json_folfer) if img.endswith(ext_name)]
+test_files = [img for img in os.listdir(json_folfer)]
 
 test_files = natsorted(test_files)
 print(test_files)

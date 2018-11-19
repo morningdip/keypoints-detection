@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import model as modellib
+import progressbar as pb
 from config import Config
 import utils
 from PIL import Image
@@ -10,6 +11,7 @@ from keras.backend.tensorflow_backend import set_session
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
+widgets = [pb.Percentage(), ' (', pb.SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', pb.AnimatedMarker(markers='◢◣◤◥'), ' ', pb.Bar(marker='>'), ' ', pb.ETA()]
 
 gpu_options = tf.GPUOptions(allow_growth=True)
 set_session(tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)))
@@ -21,10 +23,9 @@ fi_class_names = ['finger']
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, 'logs/{}_logs'.format(fi_class_names[0]))
-SELF_MODEL_PATH = os.path.join(
-    ROOT_DIR, 'model/mobile_mask_rcnn_coco_{}.h5'.format(fi_class_names[0]))
+SELF_MODEL_PATH = os.path.join(ROOT_DIR, 'model/mask_rcnn_{}_0300.h5'.format(fi_class_names[0]))
 # Local path to trained weights file
-COCO_MODEL_PATH = os.path.join(ROOT_DIR, 'model/mobilenet.h5')
+COCO_MODEL_PATH = os.path.join(ROOT_DIR, 'model/mask_rcnn_coco.h5')
 
 # Numbers of keypoints
 class_names = ['fingertip', 'joint']
@@ -45,26 +46,25 @@ class FingerConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 1  # background + keypoint
 
-    BACKBONE = 'mobilenetv1'
-    BACKBONE_STRIDES = [4, 8, 16, 32, 64]
+    BACKBONE = 'resnet50'
 
     IMAGE_MIN_DIM = 480
     IMAGE_MAX_DIM = 640
 
+    RPN_ANCHOR_SCALES = (20, 40, 80, 160, 320)
 
     RPN_TRAIN_ANCHORS_PER_IMAGE = 150
-    VALIDATION_STPES = 50
+    VALIDATION_STPES = 100
     STEPS_PER_EPOCH = 1000
+
     MINI_MASK_SHAPE = (56, 56)
     KEYPOINT_MASK_POOL_SIZE = 7
-
-    # Pooled ROIs
     POOL_SIZE = 7
     MASK_POOL_SIZE = 14
     MASK_SHAPE = [28, 28]
     WEIGHT_LOSS = True
     KEYPOINT_THRESHOLD = 0.005
-
+    # Maximum number of ground truth instances to use in one image
 
 
 config = FingerConfig()
@@ -95,12 +95,12 @@ class FingerDataset(utils.Dataset):
             # annotations = annotations.append(pd.read_csv('../data/train/annotations/data_flip.csv'), ignore_index=True)
         elif category == 'val':
             data_path = '../data/val/'
-            annotations = pd.read_csv('../data/val/test.csv')
+            annotations = pd.read_csv('../data/val/annotations/val.csv')
         else:
             pass
 
         annotations = annotations.loc[annotations['image_category'] == fi_class_names[0]]
-        annotations = annotations.reset_index(drop=True)  # 更新索引
+        annotations = annotations.reset_index(drop=True)
 
         np.random.seed(42)
         indices = np.random.permutation(annotations.shape[0])
@@ -112,11 +112,15 @@ class FingerDataset(utils.Dataset):
 
         annotations = annotations.reset_index(drop=True)
 
+        pbar = pb.ProgressBar(widgets=widgets, max_value=annotations.shape[0], redirect_stdout=True)
+        pbar.start()
+
         for x in range(annotations.shape[0]):
             # bg_color, shapes = self.random_image(height, width)
             id = annotations.loc[x, 'image_id']
             category = annotations.loc[x, 'image_category']
-            print('loading image:%d/%d' % (x, annotations.shape[0]))
+            pbar.update(x)
+            # print('loading image:%d/%d' % (x, annotations.shape[0]))
             im_path = os.path.join(data_path, id)
 
             # height, width = cv2.imread(im_path).shape[0:2]
@@ -130,6 +134,7 @@ class FingerDataset(utils.Dataset):
             self.add_image('finger', image_id=id, path=im_path,
                            width=width, height=height,
                            key_points=key_points, image_category=category)
+        pbar.finish()
 
     def load_image(self, image_id):
         info = self.image_info[image_id]
@@ -178,12 +183,12 @@ if __name__ == '__main__':
 
     # Validation dataset
     dataset_val = FingerDataset()
-    dataset_val.load_finger(category='train')
+    dataset_val.load_finger(category='val')
     dataset_val.prepare()
 
-    print('Classes: {}.\n'.format(dataset_train.class_names))
-    print('Train Images: {}.\n'.format(len(dataset_train.image_ids)))
-    print('Valid Images: {}'.format(len(dataset_val.image_ids)))
+    print('Classes: {}.'.format(dataset_train.class_names))
+    print('Train Images: {}.'.format(len(dataset_train.image_ids)))
+    print('Valid Images: {}.'.format(len(dataset_val.image_ids)))
 
     model = modellib.MaskRCNN(
         mode='training', config=config, model_dir=MODEL_DIR)
@@ -195,13 +200,15 @@ if __name__ == '__main__':
         # are different due to the different number of classes
         # See README for instructions to download the COCO weights
         model.load_weights(
-            COCO_MODEL_PATH, by_name=True, exclude=['mrcnn_class_logits', 'mrcnn_bbox_fc', 'mrcnn_bbox', 'mrcnn_mask'])
+            COCO_MODEL_PATH, by_name=False, exclude=['mrcnn_class_logits', 'mrcnn_bbox_fc', 'mrcnn_bbox', 'mrcnn_mask'])
     elif init_with == 'last':
         # Load the last model you trained and continue training
         model.load_weights(model.find_last()[1], by_name=True)
     elif init_with == 'self_mdoel':
-        model.load_weights(COCO_MODEL_PATH, by_name=True)
+        print("Loading weights from: ", SELF_MODEL_PATH)
+        model.load_weights(SELF_MODEL_PATH, by_name=True)
 
+    '''
     # Training - Stage 1
     print('Train heads')
     model.train(dataset_train, dataset_val,
@@ -218,6 +225,22 @@ if __name__ == '__main__':
     # Finetune layers from ResNet stage 4 and up
     print('Train 4+')
     model.train(dataset_train, dataset_val,
-                learning_rate=config.LEARNING_RATE / 10,
+                learning_rate=config.LEARNING_RATE / 100,
                 epochs=300,
-                layers='4+')
+                layers='all')
+    '''
+    print('Train heads')
+    model.train(dataset_train, dataset_val,
+                learning_rate=config.LEARNING_RATE,
+                epochs=100,
+                layers='heads')
+    print('Train heads')
+    model.train(dataset_train, dataset_val,
+                learning_rate=config.LEARNING_RATE / 10,
+                epochs=200,
+                layers='heads')
+    print('Train heads')
+    model.train(dataset_train, dataset_val,
+                learning_rate=config.LEARNING_RATE / 100,
+                epochs=300,
+                layers='heads')

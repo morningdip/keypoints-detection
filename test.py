@@ -29,7 +29,7 @@ widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs/{}_logs".format(fi_class_names[0]))
 model_path = os.path.join(
-    ROOT_DIR, "model/mask_rcnn_{}_0265.h5".format(fi_class_names[0]))
+    ROOT_DIR, "model/mask_rcnn_{}_0595.h5".format(fi_class_names[0]))
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -57,6 +57,13 @@ class FingerConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 1  # background + 24 key_point
 
+    BACKBONE = 'resnet50'
+
+    IMAGE_MIN_DIM = 480
+    IMAGE_MAX_DIM = 640
+
+    RPN_ANCHOR_SCALES = (20, 40, 80, 160, 320)
+
     RPN_TRAIN_ANCHORS_PER_IMAGE = 150
     VALIDATION_STPES = 100
     STEPS_PER_EPOCH = 100
@@ -77,11 +84,11 @@ class FingerConfig(Config):
 class FingerTestDataset(utils.Dataset):
 
     def load_finger_test(self):
-        test_data_path = '../data/val'
+        test_data_path = '../data/test2'
         # Add classes
         for i, class_name in enumerate(fi_class_names):
             self.add_class('finger', i + 1, class_name)
-        annotations = pd.read_csv('../data/val/annotations/test.csv')
+        annotations = pd.read_csv('../data/test2/annotations/test2.csv')
         annotations = annotations.loc[annotations['image_category'] == fi_class_names[0]]
         annotations = annotations.reset_index(drop=True)
 
@@ -119,6 +126,8 @@ if __name__ == '__main__':
     print('Loading weights from ', model_path)
     model.load_weights(model_path, by_name=True)
 
+    pro_times = []
+
     for x in progressbar.progressbar(range(0, dataset_test.num_images), widgets=widgets, redirect_stdout=True):
         image = dataset_test.load_image(x)
         category = dataset_test.image_info[x]['image_category']
@@ -134,6 +143,10 @@ if __name__ == '__main__':
         start_time = time.time()
         results = model.detect_keypoint([image], verbose=0)
         end_time = time.time()
+
+        pro_times.append(end_time - start_time)
+
+        tcolor.printmc(('RED', 'GREEN'), 'Each image spend: ', '{}'.format(end_time - start_time))
 
         r = results[0]
 
@@ -152,5 +165,8 @@ if __name__ == '__main__':
             dataset_test.class_names)
 
         pass
+
+    meam_time = np.mean(pro_times)
+    tcolor.printmc(('RED', 'Blue'), 'Mean FPS: ', '{}'.format(1 / meam_time))
 
     K.clear_session()

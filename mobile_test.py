@@ -29,7 +29,7 @@ widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs/{}_logs".format(fi_class_names[0]))
 model_path = os.path.join(
-    ROOT_DIR, "model/mobile_mask_rcnn_{}_0026.h5".format(fi_class_names[0]))
+    ROOT_DIR, "model/mobile_mask_rcnn_{}_0300.h5".format(fi_class_names[0]))
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -59,10 +59,11 @@ class FingerConfig(Config):
     NUM_CLASSES = 1 + 1  # background + keypoint
 
     BACKBONE = 'mobilenetv1'
+    BACKBONE_STRIDES = [4, 8, 16, 32, 64]
 
     RPN_TRAIN_ANCHORS_PER_IMAGE = 150
-    VALIDATION_STPES = 100
-    STEPS_PER_EPOCH = 100
+    VALIDATION_STPES = 50
+    STEPS_PER_EPOCH = 1000
     MINI_MASK_SHAPE = (56, 56)
     KEYPOINT_MASK_POOL_SIZE = 7
 
@@ -71,10 +72,7 @@ class FingerConfig(Config):
     MASK_POOL_SIZE = 14
     MASK_SHAPE = [28, 28]
     WEIGHT_LOSS = True
-    KEYPOINT_THRESHOLD = 0.005
-    # Maximum number of ground truth instances to use in one image
-    MAX_GT_INSTANCES = 128
-    DETECTION_MAX_INSTANCES = 1
+    KEYPOINT_THRESHOLD = 0.1
 
 
 class FingerTestDataset(utils.Dataset):
@@ -137,6 +135,8 @@ if __name__ == '__main__':
         start_time = time.time()
         results = model.detect_keypoint([image], verbose=0)
         end_time = time.time()
+
+        tcolor.printmc(('RED', 'GREEN'), 'Each image spend: ', '{}'.format(end_time - start_time))
 
         r = results[0]
 

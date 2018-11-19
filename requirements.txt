@@ -1,0 +1,13 @@
+Keras == 2.0.8
+Pillow == 5.1.0
+h5py == 2.7.1
+ipython == 7.1.1
+matplotlib == 2.2.2
+natsort == 5.3.2
+numpy == 1.14.2
+opencv_python == 3.4.3.18
+pandas == 0.23.4
+progressbar2 == 3.38.0
+scikit_image == 0.14.1
+scipy == 1.0.1
+tensorflow_gpu == 1.4.0
