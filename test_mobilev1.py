@@ -29,7 +29,7 @@ widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs/{}_logs".format(fi_class_names[0]))
 model_path = os.path.join(
-    ROOT_DIR, "model/mask_rcnn_{}_0600.h5".format(fi_class_names[0]))
+    ROOT_DIR, "model/mobile_mask_rcnn_{}_0228.h5".format(fi_class_names[0]))
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -57,7 +57,7 @@ class FingerConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 1  # background + 24 key_point
 
-    BACKBONE = 'resnet50'
+    BACKBONE = 'mobilenetv1'
 
     IMAGE_MIN_DIM = 480
     IMAGE_MAX_DIM = 640

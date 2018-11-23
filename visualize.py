@@ -741,7 +741,11 @@ def get_keypoints_image(frame, boxes, keypoints, class_ids, class_names, scores=
     return result_image.astype(np.uint8)
 
 
-pts = deque(maxlen=120)
+pts = deque(maxlen=500)
+
+is_saved = 0
+
+frame_number = 0
 
 
 def get_keypoints_trace(image, savename, boxes, keypoints, class_ids, class_names, skeleton=None, scores=None, title="", figsize=(16, 16), ax=None):
@@ -751,19 +755,28 @@ def get_keypoints_trace(image, savename, boxes, keypoints, class_ids, class_name
 
     N = boxes.shape[0]
 
-    color = [(244, 108, 4), (67, 67, 244), (8, 228, 252)]
+    global is_saved, frame_number
 
     if not N:
         print('\n*** No keypoints to display *** \n')
     else:
         assert boxes.shape[0] == keypoints.shape[0] == class_ids.shape[0]
 
-    x, y, vis = keypoints[0][0]
-    pts.appendleft((x, y))
+    for i in range(N):
+        x, y, vis = keypoints[0][0]
+        '''
+        if frame_number % 4 == 0:
+            pts.appendleft((x, y))
+        '''
+        pts.appendleft((x, y))
+
+        frame_number = frame_number + 1
+
     for i in range(1, len(pts)):
         if pts[i - 1] is None or pts[i] is None:
             continue
-        thickness = int(np.sqrt(64 / float(i + 1)) * 2.5)
-        cv2.line(result_image, pts[i - 1], pts[i], color[0], thickness)
+        # thickness = int(np.sqrt(64 / float(i + 1)) * 2.5)
+        thickness = 10
+        cv2.line(result_image, pts[i - 1], pts[i], (244, 108, 4), thickness)
 
     cv2.imwrite('{}'.format(savename), result_image.astype(np.uint8))

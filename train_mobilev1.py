@@ -46,7 +46,7 @@ class FingerConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 1  # background + keypoint
 
-    BACKBONE = 'resnet50'
+    BACKBONE = 'mobilenetv1'
 
     IMAGE_MIN_DIM = 480
     IMAGE_MAX_DIM = 640
@@ -193,6 +193,7 @@ if __name__ == '__main__':
     model = modellib.MaskRCNN(
         mode='training', config=config, model_dir=MODEL_DIR)
 
+    '''
     # Which weights to start with?
     init_with = 'self_mdoel'    # imagenet, coco, or last
     if init_with == 'coco':
@@ -207,6 +208,7 @@ if __name__ == '__main__':
     elif init_with == 'self_mdoel':
         print("Loading weights from: ", SELF_MODEL_PATH)
         model.load_weights(SELF_MODEL_PATH, by_name=True)
+    '''
 
     '''
     # Training - Stage 1
@@ -229,18 +231,18 @@ if __name__ == '__main__':
                 epochs=300,
                 layers='all')
     '''
-    print('Train heads')
+    print('Train all')
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
                 epochs=100,
-                layers='heads')
-    print('Train heads')
+                layers='all')
+    print('Train all')
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE / 10,
                 epochs=200,
-                layers='heads')
-    print('Train heads')
+                layers='all')
+    print('Train all')
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE / 100,
                 epochs=300,
-                layers='heads')
+                layers='all')
