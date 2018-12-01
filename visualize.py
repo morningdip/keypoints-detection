@@ -714,42 +714,12 @@ def save_keypoints(image, savename, boxes, keypoints, class_ids, class_names, sk
     cv2.imwrite('{}'.format(savename), result_image.astype(np.uint8))
 
 
-def get_keypoints_image(frame, boxes, keypoints, class_ids, class_names, scores=None):
-    result_image = frame.astype(np.float32).copy()
-    result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
-
-    print(boxes)
-
-    N = boxes.shape[0]
-
-    color = [(244, 108, 4), (67, 67, 244), (8, 228, 252)]
-
-    if not N:
-        print('\n*** No keypoints to display *** \n')
-    else:
-        assert boxes.shape[0] == keypoints.shape[0] == class_ids.shape[0]
-
-    for i in range(N):
-        y1, x1, y2, x2 = boxes[i]
-        # cv2.rectangle(result_image, (x1, y1), (x2, y2), (244, 108, 4), 3)
-
-        for idx, joint in enumerate(keypoints[i]):
-            if(joint[2] != 0):
-                cv2.circle(
-                    result_image, (joint[0], joint[1]), 3, color[idx], -1)
-
-    return result_image.astype(np.uint8)
-
-
-pts = deque(maxlen=500)
-
+pts = deque(maxlen=100)
 is_saved = 0
-
 frame_number = 0
 
 
-def get_keypoints_trace(image, savename, boxes, keypoints, class_ids, class_names, skeleton=None, scores=None, title="", figsize=(16, 16), ax=None):
-
+def get_keypoints_image(image, boxes, keypoints, class_ids, class_names, scores=None):
     result_image = image.astype(np.float32).copy()
     result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
 
@@ -764,11 +734,44 @@ def get_keypoints_trace(image, savename, boxes, keypoints, class_ids, class_name
 
     for i in range(N):
         x, y, vis = keypoints[0][0]
+
         '''
         if frame_number % 4 == 0:
             pts.appendleft((x, y))
         '''
+
         pts.appendleft((x, y))
+
+        frame_number = frame_number + 1
+
+    for i in range(1, len(pts)):
+        if pts[i - 1] is None or pts[i] is None:
+            continue
+        # thickness = int(np.sqrt(64 / float(i + 1)) * 2.5)
+        thickness = 10
+        cv2.line(result_image, pts[i - 1], pts[i], (244, 108, 4), thickness)
+
+    return result_image.astype(np.uint8)
+
+
+def get_keypoints_trace(image, savename, boxes, keypoints, class_ids, class_names, skeleton=None, scores=None, title="", figsize=(16, 16), ax=None):
+    result_image = image.astype(np.float32).copy()
+    result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
+
+    N = boxes.shape[0]
+
+    global is_saved, frame_number
+
+    if not N:
+        print('\n*** No keypoints to display *** \n')
+    else:
+        assert boxes.shape[0] == keypoints.shape[0] == class_ids.shape[0]
+
+    for i in range(N):
+        x, y, vis = keypoints[0][0]
+
+        if frame_number % 4 == 0:
+            pts.appendleft((x, y))
 
         frame_number = frame_number + 1
 

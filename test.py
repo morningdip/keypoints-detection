@@ -15,7 +15,7 @@ from keras import backend as K
 from progressbar import AnimatedMarker, Bar, ETA, Percentage, SimpleProgress
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 
 # Root directory of the project
 ROOT_DIR = '../'
@@ -84,7 +84,7 @@ class FingerConfig(Config):
 class FingerTestDataset(utils.Dataset):
 
     def load_finger_test(self):
-        test_data_path = '../data/test2'
+        test_data_path = '../data/ipcam'
         # Add classes
         for i, class_name in enumerate(fi_class_names):
             self.add_class('finger', i + 1, class_name)

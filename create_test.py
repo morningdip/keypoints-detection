@@ -2,8 +2,8 @@ import os
 import csv
 from natsort import natsorted
 
-json_folfer = '../data/test3/images'
-output_folder = '../data/test3/annotations/test.csv'
+json_folfer = '../data/ipcam/images'
+output_folder = '../data/ipcam/annotations/test.csv'
 
 test_files = [img for img in os.listdir(json_folfer)]
 

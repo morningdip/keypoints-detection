@@ -210,7 +210,6 @@ if __name__ == '__main__':
         model.load_weights(SELF_MODEL_PATH, by_name=True)
     '''
 
-    '''
     # Training - Stage 1
     print('Train heads')
     model.train(dataset_train, dataset_val,
@@ -230,6 +229,7 @@ if __name__ == '__main__':
                 learning_rate=config.LEARNING_RATE / 100,
                 epochs=300,
                 layers='all')
+
     '''
     print('Train all')
     model.train(dataset_train, dataset_val,
@@ -246,3 +246,4 @@ if __name__ == '__main__':
                 learning_rate=config.LEARNING_RATE / 100,
                 epochs=300,
                 layers='all')
+    '''

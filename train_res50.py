@@ -23,7 +23,7 @@ fi_class_names = ['finger']
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, 'logs/{}_logs'.format(fi_class_names[0]))
-SELF_MODEL_PATH = os.path.join(ROOT_DIR, 'model/mask_rcnn_{}_0600.h5'.format(fi_class_names[0]))
+SELF_MODEL_PATH = os.path.join(ROOT_DIR, 'model/mask_rcnn_{}_0900.h5'.format(fi_class_names[0]))
 # Local path to trained weights file
 COCO_MODEL_PATH = os.path.join(ROOT_DIR, 'model/mask_rcnn_coco.h5')
 
@@ -208,7 +208,6 @@ if __name__ == '__main__':
         print("Loading weights from: ", SELF_MODEL_PATH)
         model.load_weights(SELF_MODEL_PATH, by_name=True)
 
-    '''
     # Training - Stage 1
     print('Train heads')
     model.train(dataset_train, dataset_val,
@@ -218,14 +217,14 @@ if __name__ == '__main__':
     # Training - Stage 2
     print('Train heads')
     model.train(dataset_train, dataset_val,
-                learning_rate=config.LEARNING_RATE / 10,
+                learning_rate=config.LEARNING_RATE / 100,
                 epochs=200,
                 layers='heads')
     # Training - Stage 3
     # Finetune layers from ResNet stage 4 and up
     print('Train 4+')
     model.train(dataset_train, dataset_val,
-                learning_rate=config.LEARNING_RATE / 100,
+                learning_rate=config.LEARNING_RATE / 10000,
                 epochs=300,
                 layers='all')
     '''
@@ -244,3 +243,4 @@ if __name__ == '__main__':
                 learning_rate=config.LEARNING_RATE / 100,
                 epochs=300,
                 layers='heads')
+    '''
