@@ -1,21 +1,16 @@
 import os
 import time
 import numpy as np
-import pandas as pd
 import cv2
-
-import utils
+import datetime
 import model as modellib
 import visualize
-import progressbar
 import terminal_color as tc
+
 from config import Config
 from keras import backend as K
-from progressbar import AnimatedMarker, Bar, ETA, Percentage, SimpleProgress
-
 from queue import Queue
 from threading import Thread
-import datetime
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -27,12 +22,10 @@ fi_class_names = ['finger']
 class_names = ['fingertip', 'joint']
 index = [0, 1]
 
-widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', AnimatedMarker(markers='◢◣◤◥'), ' ', Bar(marker='>'), ' ', ETA()]
-
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs/{}_logs".format(fi_class_names[0]))
-model_path = os.path.join(ROOT_DIR, "model/mask_rcnn_{}_0600.h5".format(fi_class_names[0]))
-#model_path = os.path.join(ROOT_DIR, "model/mobile_mask_rcnn_finger_0228.h5")
+model_path = os.path.join(ROOT_DIR, "model/mobilev2_mask_rcnn_{}_0300.h5".format(fi_class_names[0]))
+
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -118,7 +111,7 @@ class FingerConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 1  # background + 24 key_point
 
-    BACKBONE = 'resnet50'
+    BACKBONE = 'mobilenetv2'
 
     IMAGE_MIN_DIM = 480
     IMAGE_MAX_DIM = 640
@@ -157,66 +150,67 @@ def worker(input_q, output_q):
     null_image = np.zeros((1, 1, 3))
     model.detect_keypoint([null_image], verbose=0)
 
-    fps = FPS().start()
+    # fps = FPS().start()
     while True:
-        fps.update()
+        # fps.update()
         frame = input_q.get()
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         output_q.put((frame_rgb, model.detect_keypoint([frame_rgb], verbose=0)))
 
-    fps.stop()
+    # fps.stop()
     K.clear_session()
 
 
 if __name__ == '__main__':
 
-    input_q = Queue(5)  # fps is better if queue is higher but then more lags
+    input_q = Queue(1)  # fps is better if queue is higher but then more lags
     output_q = Queue()
     for i in range(1):
         t = Thread(target=worker, args=(input_q, output_q))
         t.daemon = True
         t.start()
 
-    video_capture = WebcamVideoStream(src='http://140.115.54.125:5566/videostream.cgi?.mjpg',
+    video_capture = WebcamVideoStream(src='http://140.115.54.125:8090/videostream.cgi?.mjpg',
                                       width=640, height=480).start()
 
     frame_num = 0
-    fps = FPS().start()
+    #fps = FPS().start()
 
     while True:
         frame = video_capture.read()
 
-        t = time.time()
+        # t = time.time()
 
         if frame_num % 4 == 0:
+            frame_num = 0
             input_q.put(frame)
         else:
             pass
 
         if output_q.empty():
-            print('pass')
             pass  # fill up queue
         else:
-            print('processing')
             tmp, data = output_q.get()
-            # print(data[0])
-            r = data[0]
 
+            r = data[0]
+            start_time = time.time()
             keypoints_image = visualize.get_keypoints_image(tmp, r['rois'], r['keypoints'], r['class_ids'], class_names)
+            # end_time = time.time()
+            # print('Each image spend: ', '{}'.format(end_time - start_time))
             cv2.imshow('Demo', keypoints_image)
 
-        frame_num += 1
+        #frame_num += 1
 
-        fps.update()
+        # fps.update()
 
-        print('[INFO] elapsed time: {:.2f}'.format(time.time() - t))
+        #print('[INFO] elapsed time: {:.2f}'.format(time.time() - t))
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    fps.stop()
-    print('[INFO] elapsed time (total): {:.2f}'.format(fps.elapsed()))
-    print('[INFO] approx. FPS: {:.2f}'.format(fps.fps()))
+    #fps.stop()
+    #print('[INFO] elapsed time (total): {:.2f}'.format(fps.elapsed()))
+    #print('[INFO] approx. FPS: {:.2f}'.format(fps.fps()))
 
 video_capture.stop()
 cv2.destroyAllWindows()

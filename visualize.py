@@ -697,6 +697,8 @@ def save_keypoints(image, savename, boxes, keypoints, class_ids, class_names, sk
 
     color = [(244, 108, 4), (67, 67, 244), (8, 228, 252)]
 
+    N = boxes.shape[0]
+
     if not N:
         print('\n*** No keypoints to display *** \n')
     else:
@@ -714,7 +716,26 @@ def save_keypoints(image, savename, boxes, keypoints, class_ids, class_names, sk
     cv2.imwrite('{}'.format(savename), result_image.astype(np.uint8))
 
 
-pts = deque(maxlen=100)
+def save_fingertip_keypoint(image, savename, boxes, keypoints, class_ids, class_names, skeleton=None, scores=None, title="", figsize=(16, 16), ax=None):
+
+    result_image = image.astype(np.float32).copy()
+    result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
+
+    N = boxes.shape[0]
+
+    if not N:
+        print('\n*** No keypoints to display *** \n')
+    else:
+        assert boxes.shape[0] == keypoints.shape[0] == class_ids.shape[0]
+
+    for i in range(N):
+        x, y, vis = keypoints[0][0]
+        cv2.circle(result_image, (x, y), 3, (244, 108, 4), -1)
+
+    cv2.imwrite('{}'.format(savename), result_image.astype(np.uint8))
+
+
+pts = deque(maxlen=50)
 is_saved = 0
 frame_number = 0
 
@@ -729,8 +750,7 @@ def get_keypoints_image(image, boxes, keypoints, class_ids, class_names, scores=
 
     if not N:
         print('\n*** No keypoints to display *** \n')
-    else:
-        assert boxes.shape[0] == keypoints.shape[0] == class_ids.shape[0]
+
 
     for i in range(N):
         x, y, vis = keypoints[0][0]
@@ -742,7 +762,7 @@ def get_keypoints_image(image, boxes, keypoints, class_ids, class_names, scores=
 
         pts.appendleft((x, y))
 
-        frame_number = frame_number + 1
+        #frame_number = frame_number + 1
 
     for i in range(1, len(pts)):
         if pts[i - 1] is None or pts[i] is None:

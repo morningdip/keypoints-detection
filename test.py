@@ -8,6 +8,7 @@ import model as modellib
 import visualize
 import progressbar
 import terminal_color as tc
+
 from config import Config
 from model import log
 from PIL import Image
@@ -27,9 +28,8 @@ index = [0, 1]
 widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', AnimatedMarker(markers='◢◣◤◥'), ' ', Bar(marker='>'), ' ', ETA()]
 
 # Directory to save logs and trained model
-MODEL_DIR = os.path.join(ROOT_DIR, "logs/{}_logs".format(fi_class_names[0]))
-model_path = os.path.join(
-    ROOT_DIR, "model/mask_rcnn_{}_0600.h5".format(fi_class_names[0]))
+MODEL_DIR = os.path.join(ROOT_DIR, 'logs/{}_logs'.format(fi_class_names[0]))
+model_path = os.path.join(ROOT_DIR, 'model/mask_rcnn_finger_0900.h5')
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -84,7 +84,7 @@ class FingerConfig(Config):
 class FingerTestDataset(utils.Dataset):
 
     def load_finger_test(self):
-        test_data_path = '../data/ipcam'
+        test_data_path = '../data/test2'
         # Add classes
         for i, class_name in enumerate(fi_class_names):
             self.add_class('finger', i + 1, class_name)
@@ -160,7 +160,7 @@ if __name__ == '__main__':
 
         save_img_path = os.path.join(results_path, image_name + '.png')
 
-        visualize.get_keypoints_trace(
+        visualize.save_fingertip_keypoint(
             image, save_img_path,
             r['rois'], r['keypoints'], r['class_ids'],
             dataset_test.class_names)

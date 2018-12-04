@@ -34,13 +34,6 @@ from distutils.version import LooseVersion
 assert LooseVersion(tf.__version__) >= LooseVersion("1.3")
 assert LooseVersion(keras.__version__) >= LooseVersion('2.0.8')
 
-## MobileNetV1 Imports
-import keras.initializers as KI
-import keras.regularizers as KR
-import keras.constraints as KC
-from keras.utils import conv_utils
-from keras.engine import InputSpec
-
 
 ############################################################
 #  Utility Functions
@@ -449,13 +442,13 @@ def mobilenetv2_graph(inputs, architecture, alpha=1.0, train_bn=False):
     assert architecture in ["mobilenetv2"]
 
     x = _conv_block(inputs, 32, alpha, (3, 3), strides=(2, 2), block_id=0, train_bn=train_bn)  # Input Res: 1
-    C1 = x = _inverted_residual_block(x, 16, (3, 3), t=1, strides=1, n=1, alpha=1.0, block_id=1, train_bn=train_bn)  # Input Res: 1/2
-    C2 = x = _inverted_residual_block(x, 24, (3, 3), t=6, strides=2, n=2, alpha=1.0, block_id=2, train_bn=train_bn)  # Input Res: 1/2
-    C3 = x = _inverted_residual_block(x, 32, (3, 3), t=6, strides=2, n=3, alpha=1.0, block_id=4, train_bn=train_bn)  # Input Res: 1/4
-    x = _inverted_residual_block(x, 64, (3, 3), t=6, strides=2, n=4, alpha=1.0, block_id=7, train_bn=train_bn)  # Input Res: 1/8
-    C4 = x = _inverted_residual_block(x, 96, (3, 3), t=6, strides=1, n=3, alpha=1.0, block_id=11, train_bn=train_bn)  # Input Res: 1/8
-    x = _inverted_residual_block(x, 160, (3, 3), t=6, strides=2, n=3, alpha=1.0, block_id=14, train_bn=train_bn)  # Input Res: 1/16
-    C5 = x = _inverted_residual_block(x, 320, (3, 3), t=6, strides=1, n=1, alpha=1.0, block_id=17, train_bn=train_bn)  # Input Res: 1/32
+    C1 = x = _inverted_residual_block(x, 16, (3, 3), t=1, strides=1, n=1, alpha=1.0, block_id=1, train_bn=train_bn)     # Input Res: 1/2
+    C2 = x = _inverted_residual_block(x, 24, (3, 3), t=6, strides=2, n=2, alpha=1.0, block_id=2, train_bn=train_bn)     # Input Res: 1/2
+    C3 = x = _inverted_residual_block(x, 32, (3, 3), t=6, strides=2, n=3, alpha=1.0, block_id=4, train_bn=train_bn)     # Input Res: 1/4
+    x = _inverted_residual_block(x, 64, (3, 3), t=6, strides=2, n=4, alpha=1.0, block_id=7, train_bn=train_bn)          # Input Res: 1/8
+    C4 = x = _inverted_residual_block(x, 96, (3, 3), t=6, strides=1, n=3, alpha=1.0, block_id=11, train_bn=train_bn)    # Input Res: 1/8
+    x = _inverted_residual_block(x, 160, (3, 3), t=6, strides=2, n=3, alpha=1.0, block_id=14, train_bn=train_bn)        # Input Res: 1/16
+    C5 = x = _inverted_residual_block(x, 320, (3, 3), t=6, strides=1, n=1, alpha=1.0, block_id=17, train_bn=train_bn)   # Input Res: 1/32
     # x = _conv_block(x, 1280, alpha, (1, 1), strides=(1, 1), block_id=18, train_bn=train_bn)  # Input Res: 1/32
 
     return [C1, C2, C3, C4, C5]
@@ -2770,7 +2763,7 @@ class MaskRCNN():
             _, C2, C3, C4, C5 = resnet_graph(input_image, config.BACKBONE, stage5=True)
         elif config.BACKBONE in ['mobilenetv1']:
             _, C2, C3, C4, C5 = mobilenetv1_graph(input_image, config.BACKBONE, alpha=1.0)
-        elif config.BACKBONE in ["mobilenetv2"]:
+        elif config.BACKBONE in ['mobilenetv2']:
             _, C2, C3, C4, C5 = mobilenetv2_graph(input_image, config.BACKBONE, alpha=1.0)
         # Top-down Layers
         # TODO: add assert to varify feature map sizes match what's in config
@@ -3164,7 +3157,10 @@ class MaskRCNN():
             self.checkpoint_path = os.path.join(self.log_dir, "mask_rcnn_{}_*epoch*.h5".format(self.config.NAME.lower()))
             self.checkpoint_path = self.checkpoint_path.replace("*epoch*", "{epoch:04d}")
         elif self.config.BACKBONE in ['mobilenetv1']:
-            self.checkpoint_path = os.path.join(self.log_dir, "mobile_mask_rcnn_{}_*epoch*.h5".format(self.config.NAME.lower()))
+            self.checkpoint_path = os.path.join(self.log_dir, "mobilev1_mask_rcnn_{}_*epoch*.h5".format(self.config.NAME.lower()))
+            self.checkpoint_path = self.checkpoint_path.replace("*epoch*", "{epoch:04d}")
+        elif self.config.BACKBONE in ['mobilenetv2']:
+            self.checkpoint_path = os.path.join(self.log_dir, "mobilev2_mask_rcnn_{}_*epoch*.h5".format(self.config.NAME.lower()))
             self.checkpoint_path = self.checkpoint_path.replace("*epoch*", "{epoch:04d}")
 
     def train(self, train_dataset, val_dataset, learning_rate, epochs, layers):
@@ -3468,7 +3464,8 @@ class MaskRCNN():
         assert self.mode == "inference", "Create model in inference mode."
         assert len(images) == self.config.BATCH_SIZE, "len(images) must be equal to BATCH_SIZE"
 
-        # self.keras_model.summary()
+        #self.keras_model.summary()
+        print(self.keras_model.count_params())
 
         if verbose:
             log("Processing {} images".format(len(images)))

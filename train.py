@@ -228,3 +228,21 @@ if __name__ == '__main__':
                 learning_rate=config.LEARNING_RATE / 100,
                 epochs=300,
                 layers='all')
+
+    '''
+    print('Train all')
+    model.train(dataset_train, dataset_val,
+                learning_rate=config.LEARNING_RATE,
+                epochs=100,
+                layers='all')
+    print('Train all')
+    model.train(dataset_train, dataset_val,
+                learning_rate=config.LEARNING_RATE / 10,
+                epochs=200,
+                layers='all')
+    print('Train all')
+    model.train(dataset_train, dataset_val,
+                learning_rate=config.LEARNING_RATE / 100,
+                epochs=300,
+                layers='all')
+    '''
