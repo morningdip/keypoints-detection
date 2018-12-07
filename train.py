@@ -7,11 +7,13 @@ import progressbar as pb
 from config import Config
 import utils
 from PIL import Image
+from progressbar import AnimatedMarker, Bar, ETA, Percentage, SimpleProgress
 from keras.backend.tensorflow_backend import set_session
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
-widgets = [pb.Percentage(), ' (', pb.SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', pb.AnimatedMarker(markers='◢◣◤◥'), ' ', pb.Bar(marker='>'), ' ', pb.ETA()]
+widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', AnimatedMarker(markers='◢◣◤◥'), ' ', Bar(marker='>'), ' ', ETA()]
 
 gpu_options = tf.GPUOptions(allow_growth=True)
 set_session(tf.Session(config=tf.ConfigProto(gpu_options=gpu_options)))
@@ -46,16 +48,21 @@ class FingerConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 1  # background + keypoint
 
-    BACKBONE = 'resnet101'
+    BACKBONE = 'mobilenetv2'
 
     IMAGE_MIN_DIM = 480
     IMAGE_MAX_DIM = 640
 
     RPN_ANCHOR_SCALES = (20, 40, 80, 160, 320)
 
-    RPN_TRAIN_ANCHORS_PER_IMAGE = 150
+    # RPN_TRAIN_ANCHORS_PER_IMAGE = 150
+    RPN_TRAIN_ANCHORS_PER_IMAGE = 64
     VALIDATION_STPES = 100
     STEPS_PER_EPOCH = 1000
+
+    # ROIs kept after non-maximum supression (training and inference)
+    POST_NMS_ROIS_TRAINING = 200
+    POST_NMS_ROIS_INFERENCE = 100
 
     MINI_MASK_SHAPE = (56, 56)
     KEYPOINT_MASK_POOL_SIZE = 7
@@ -64,7 +71,6 @@ class FingerConfig(Config):
     MASK_SHAPE = [28, 28]
     WEIGHT_LOSS = True
     KEYPOINT_THRESHOLD = 0.005
-    # Maximum number of ground truth instances to use in one image
 
 
 config = FingerConfig()
@@ -209,6 +215,7 @@ if __name__ == '__main__':
         model.load_weights(SELF_MODEL_PATH, by_name=True)
     '''
 
+    '''
     # Training - Stage 1
     print('Train heads')
     model.train(dataset_train, dataset_val,
@@ -228,8 +235,8 @@ if __name__ == '__main__':
                 learning_rate=config.LEARNING_RATE / 100,
                 epochs=300,
                 layers='all')
-
     '''
+
     print('Train all')
     model.train(dataset_train, dataset_val,
                 learning_rate=config.LEARNING_RATE,
@@ -245,4 +252,3 @@ if __name__ == '__main__':
                 learning_rate=config.LEARNING_RATE / 100,
                 epochs=300,
                 layers='all')
-    '''

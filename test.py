@@ -2,21 +2,20 @@ import os
 import time
 import numpy as np
 import pandas as pd
-
 import utils
 import model as modellib
 import visualize
-import progressbar
-import terminal_color as tc
 
 from config import Config
-from model import log
 from PIL import Image
 from keras import backend as K
-from progressbar import AnimatedMarker, Bar, ETA, Percentage, SimpleProgress
+from progressbar import AnimatedMarker, Bar, ETA, Percentage, SimpleProgress, ProgressBar, FormatCustomText
+
+import terminal_color as tc
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # Root directory of the project
 ROOT_DIR = '../'
@@ -25,11 +24,9 @@ fi_class_names = ['finger']
 class_names = ['fingertip', 'joint']
 index = [0, 1]
 
-widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', AnimatedMarker(markers='◢◣◤◥'), ' ', Bar(marker='>'), ' ', ETA()]
-
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, 'logs/{}_logs'.format(fi_class_names[0]))
-model_path = os.path.join(ROOT_DIR, 'model/mask_rcnn_finger_0900.h5')
+model_path = os.path.join(ROOT_DIR, 'model/mobilev2_mask_rcnn_finger_0262.h5')
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -57,18 +54,23 @@ class FingerConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 1  # background + 24 key_point
 
-    BACKBONE = 'resnet50'
+    BACKBONE = 'mobilenetv2'
 
     IMAGE_MIN_DIM = 480
     IMAGE_MAX_DIM = 640
 
     RPN_ANCHOR_SCALES = (20, 40, 80, 160, 320)
 
-    RPN_TRAIN_ANCHORS_PER_IMAGE = 150
+    # RPN_TRAIN_ANCHORS_PER_IMAGE = 150
+    RPN_TRAIN_ANCHORS_PER_IMAGE = 64
     VALIDATION_STPES = 100
     STEPS_PER_EPOCH = 100
     MINI_MASK_SHAPE = (56, 56)
     KEYPOINT_MASK_POOL_SIZE = 7
+
+    # ROIs kept after non-maximum supression (training and inference)
+    POST_NMS_ROIS_TRAINING = 200
+    POST_NMS_ROIS_INFERENCE = 100
 
     # Pooled ROIs
     POOL_SIZE = 7
@@ -127,47 +129,51 @@ if __name__ == '__main__':
     print('Loading weights from ', model_path)
     model.load_weights(model_path, by_name=True)
 
-    pro_times = []
+    null_image = np.zeros((1, 1, 3))
+    results = model.detect_keypoint([null_image], verbose=0)
 
-    for x in progressbar.progressbar(range(0, dataset_test.num_images), widgets=widgets, redirect_stdout=True):
+    detect_times = []
+
+    detect_time_format_text = FormatCustomText(
+        ' %(detect_time).3f sec',
+        dict(
+            detect_time=0,
+        ),
+    )
+
+    widgets = [Percentage(), detect_time_format_text, ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', AnimatedMarker(markers='.oO@* '), ' ', Bar(marker='>'), ' ', ETA()]
+
+    pbar = ProgressBar(widgets=widgets, max_value=dataset_test.num_images, redirect_stdout=True)
+    pbar.start()
+
+    for index, x in enumerate(range(0, dataset_test.num_images)):
         image = dataset_test.load_image(x)
         category = dataset_test.image_info[x]['image_category']
         image_id = dataset_test.image_info[x]['id']
         image_name, image_ext = os.path.splitext(
             os.path.basename(dataset_test.image_info[x]['id']))
 
-        # print(, '- 0.13 seconds')
-
-        null_image = np.zeros((1, 1, 3))
-        results = model.detect_keypoint([null_image], verbose=0)
-
         start_time = time.time()
         results = model.detect_keypoint([image], verbose=0)
         end_time = time.time()
 
-        pro_times.append(end_time - start_time)
-
-        tcolor.printmc(('RED', 'GREEN'), 'Each image spend: ', '{}'.format(end_time - start_time))
+        detect_times.append(end_time - start_time)
 
         r = results[0]
 
-        '''
-        log("image", image)
-        log("rois", r['rois'])
-        log("keypoints", r['keypoints'])
-        log("class_ids", r['class_ids'])
-        '''
-
         save_img_path = os.path.join(results_path, image_name + '.png')
 
-        visualize.save_fingertip_keypoint(
+        visualize.save_keypoints(
             image, save_img_path,
             r['rois'], r['keypoints'], r['class_ids'],
             dataset_test.class_names)
 
-        pass
+        detect_time_format_text.update_mapping(detect_time=end_time - start_time)
+        pbar.update(index)
 
-    meam_time = np.mean(pro_times)
+    pbar.finish()
+
+    meam_time = np.mean(detect_times)
     tcolor.printmc(('RED', 'Blue'), 'Mean FPS: ', '{}'.format(1 / meam_time))
 
     K.clear_session()
