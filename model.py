@@ -26,7 +26,6 @@ import keras.backend as K
 import keras.layers as KL
 import keras.engine as KE
 import keras.models as KM
-
 import utils
 
 # Requires TensorFlow 1.3+ and Keras 2.0.8+.
@@ -308,11 +307,11 @@ def _depthwise_conv_block(inputs, pointwise_conv_filters, alpha,
     # Depthwise
     x = KL.DepthwiseConv2D(
         (3, 3), padding='same', depth_multiplier=depth_multiplier, strides=strides, use_bias=False, name='conv_dw_{}'.format(block_id))(inputs)
-    x = BatchNorm(axis=3, name='conv_dw_{}_bn'.format(block_id))(x, training=train_bn)
+    x = BatchNorm(axis=channel_axis, name='conv_dw_{}_bn'.format(block_id))(x, training=train_bn)
     x = KL.Activation(relu6, name='conv_dw_{}_relu'.format(block_id))(x)
     # Pointwise
     x = KL.Conv2D(pointwise_conv_filters, (1, 1), padding='same', use_bias=False, strides=(1, 1), name='conv_pw_{}'.format(block_id))(x)
-    x = BatchNorm(axis=3, name='conv_pw_{}_bn'.format(block_id))(x, training=train_bn)
+    x = BatchNorm(axis=channel_axis, name='conv_pw_{}_bn'.format(block_id))(x, training=train_bn)
     return KL.Activation(relu6, name='conv_pw_{}_relu'.format(block_id))(x)
 
 
@@ -389,12 +388,12 @@ def _bottleneck(inputs, filters, kernel, t, s, r=False, alpha=1.0, block_id=1, t
 
     x = KL.DepthwiseConv2D(
         kernel, strides=(s, s), depth_multiplier=1, padding='same', name='conv_dw_{}'.format(block_id))(x)
-    x = BatchNorm(axis=3, name='conv_dw_{}_bn'.format(block_id))(x, training=train_bn)
+    x = BatchNorm(axis=channel_axis, name='conv_dw_{}_bn'.format(block_id))(x, training=train_bn)
     x = KL.Activation(relu6, name='conv_dw_{}_relu'.format(block_id))(x)
 
     x = KL.Conv2D(
         filters, (1, 1), strides=(1, 1), padding='same', name='conv_pw_{}'.format(block_id))(x)
-    x = BatchNorm(axis=3, name='conv_pw_{}_bn'.format(block_id))(x, training=train_bn)
+    x = BatchNorm(axis=channel_axis, name='conv_pw_{}_bn'.format(block_id))(x, training=train_bn)
 
     if r:
         x = KL.add([x, inputs], name='res{}'.format(block_id))
@@ -441,17 +440,52 @@ def mobilenetv2_graph(inputs, architecture, alpha=1.0, train_bn=False):
     """
     assert architecture in ["mobilenetv2"]
 
-    x = _conv_block(inputs, 32, alpha, (3, 3), strides=(2, 2), block_id=0, train_bn=train_bn)  # Input Res: 1
-    C1 = x = _inverted_residual_block(x, 16, (3, 3), t=1, strides=1, n=1, alpha=1.0, block_id=1, train_bn=train_bn)     # Input Res: 1/2
-    C2 = x = _inverted_residual_block(x, 24, (3, 3), t=6, strides=2, n=2, alpha=1.0, block_id=2, train_bn=train_bn)     # Input Res: 1/2
-    C3 = x = _inverted_residual_block(x, 32, (3, 3), t=6, strides=2, n=3, alpha=1.0, block_id=4, train_bn=train_bn)     # Input Res: 1/4
-    x = _inverted_residual_block(x, 64, (3, 3), t=6, strides=2, n=4, alpha=1.0, block_id=7, train_bn=train_bn)          # Input Res: 1/8
-    C4 = x = _inverted_residual_block(x, 96, (3, 3), t=6, strides=1, n=3, alpha=1.0, block_id=11, train_bn=train_bn)    # Input Res: 1/8
-    x = _inverted_residual_block(x, 160, (3, 3), t=6, strides=2, n=3, alpha=1.0, block_id=14, train_bn=train_bn)        # Input Res: 1/16
+    '''
+    x = _conv_block(inputs, 32, alpha, (3, 3), strides=(2, 2), block_id=0, train_bn=train_bn)                           # Input Res: 1
+    C1 = x = _inverted_residual_block(x, 16,  (3, 3), t=1, strides=1, n=1, alpha=1.0, block_id=1, train_bn=train_bn)    # Input Res: 1/2
+    C2 = x = _inverted_residual_block(x, 24,  (3, 3), t=6, strides=2, n=2, alpha=1.0, block_id=2, train_bn=train_bn)    # Input Res: 1/2
+    C3 = x = _inverted_residual_block(x, 32,  (3, 3), t=6, strides=2, n=3, alpha=1.0, block_id=4, train_bn=train_bn)    # Input Res: 1/4
+    x = _inverted_residual_block(x, 64,  (3, 3), t=6, strides=2, n=4, alpha=1.0, block_id=7, train_bn=train_bn)         # Input Res: 1/8
+    C4 = x = _inverted_residual_block(x, 96,  (3, 3), t=6, strides=1, n=3, alpha=1.0, block_id=11, train_bn=train_bn)   # Input Res: 1/8
+    x  = _inverted_residual_block(x, 160, (3, 3), t=6, strides=2, n=3, alpha=1.0, block_id=14, train_bn=train_bn)       # Input Res: 1/16
     C5 = x = _inverted_residual_block(x, 320, (3, 3), t=6, strides=1, n=1, alpha=1.0, block_id=17, train_bn=train_bn)   # Input Res: 1/32
-    # x = _conv_block(x, 1280, alpha, (1, 1), strides=(1, 1), block_id=18, train_bn=train_bn)  # Input Res: 1/32
+    #x = _conv_block(x, 1280, alpha, (1, 1), strides=(1, 1), block_id=18, train_bn=train_bn)                            # Input Res: 1/32
+    '''
 
-    return [C1, C2, C3, C4, C5]
+    '''
+    # v3
+    x = _conv_block(inputs, 32, alpha, (3, 3), strides=(2, 2), block_id=0, train_bn=train_bn)                           # Input Res: 1
+    C1 = x = _inverted_residual_block(x, 16, (3, 3), t=1, strides=1, n=1, alpha=1.0, block_id=1, train_bn=train_bn)     # Input Res: 1/2
+    C2 = x = _inverted_residual_block(x, 24, (3, 3), t=6, strides=2, n=1, alpha=1.0, block_id=2, train_bn=train_bn)     # Input Res: 1/2
+    C3 = x = _inverted_residual_block(x, 32, (3, 3), t=6, strides=2, n=2, alpha=1.0, block_id=3, train_bn=train_bn)     # Input Res: 1/4
+    x = _inverted_residual_block(x, 64, (3, 3), t=6, strides=2, n=3, alpha=1.0, block_id=5, train_bn=train_bn)          # Input Res: 1/8
+    C4 = x = _inverted_residual_block(x, 96, (3, 3), t=6, strides=1, n=2, alpha=1.0, block_id=8, train_bn=train_bn)     # Input Res: 1/8
+    x = _inverted_residual_block(x, 160, (3, 3), t=6, strides=2, n=2, alpha=1.0, block_id=10, train_bn=train_bn)        # Input Res: 1/16
+    C5 = x = _inverted_residual_block(x, 320, (3, 3), t=6, strides=1, n=1, alpha=1.0, block_id=12, train_bn=train_bn)   # Input Res: 1/32
+    '''
+
+    # v5
+    x = _conv_block(inputs, 32, alpha, (3, 3), strides=(2, 2), block_id=0, train_bn=train_bn)                           # Input Res: 1
+    C1 = x = _inverted_residual_block(x, 16, (3, 3), t=1, strides=1, n=1, alpha=1.0, block_id=1, train_bn=train_bn)     # Input Res: 1/2
+    C2 = x = _inverted_residual_block(x, 24, (3, 3), t=6, strides=2, n=1, alpha=1.0, block_id=2, train_bn=train_bn)     # Input Res: 1/2
+    C3 = x = _inverted_residual_block(x, 32, (3, 3), t=6, strides=2, n=2, alpha=1.0, block_id=3, train_bn=train_bn)     # Input Res: 1/4
+    x = _inverted_residual_block(x, 64, (3, 3), t=6, strides=2, n=3, alpha=1.0, block_id=5, train_bn=train_bn)          # Input Res: 1/8
+    C4 = x = _inverted_residual_block(x, 96, (3, 3), t=6, strides=1, n=2, alpha=1.0, block_id=8, train_bn=train_bn)     # Input Res: 1/8
+
+    '''
+    # v4
+    x = _conv_block(inputs, 32, alpha, (3, 3), strides=(2, 2), block_id=0, train_bn=train_bn)                           # Input Res: 1
+    C1 = x = _inverted_residual_block(x, 16, (3, 3), t=1, strides=1, n=1, alpha=1.0, block_id=1, train_bn=train_bn)     # Input Res: 1/2
+    C2 = x = _inverted_residual_block(x, 24, (3, 3), t=6, strides=2, n=1, alpha=1.0, block_id=2, train_bn=train_bn)     # Input Res: 1/2
+    C3 = x = _inverted_residual_block(x, 32, (3, 3), t=6, strides=2, n=1, alpha=1.0, block_id=3, train_bn=train_bn)     # Input Res: 1/4
+    x = _inverted_residual_block(x, 64, (3, 3), t=6, strides=2, n=1, alpha=1.0, block_id=4, train_bn=train_bn)          # Input Res: 1/8
+    C4 = x = _inverted_residual_block(x, 96, (3, 3), t=6, strides=1, n=1, alpha=1.0, block_id=5, train_bn=train_bn)     # Input Res: 1/8
+    x = _inverted_residual_block(x, 160, (3, 3), t=6, strides=2, n=1, alpha=1.0, block_id=6, train_bn=train_bn)         # Input Res: 1/16
+    C5 = x = _inverted_residual_block(x, 320, (3, 3), t=6, strides=1, n=1, alpha=1.0, block_id=7, train_bn=train_bn)    # Input Res: 1/32
+    # x = _conv_block(x, 1280, alpha, (1, 1), strides=(1, 1), block_id=18, train_bn=train_bn)  # Input Res: 1/32
+    '''
+
+    return [C1, C2, C3, C4]
 
 
 ############################################################
@@ -644,7 +678,7 @@ class PyramidROIAlign(KE.Layer):
         # Loop through levels and apply ROI pooling to each. P2 to P5.
         pooled = []
         box_to_level = []
-        for i, level in enumerate(range(2, 6)):
+        for i, level in enumerate(range(2, 5)):
             ix = tf.where(tf.equal(roi_level, level))
             level_boxes = tf.gather_nd(boxes, ix)
 
@@ -989,8 +1023,8 @@ def detection_keypoint_targets_graph(proposals, gt_class_ids, gt_boxes, gt_keypo
         y = tf.cast(roi_keypoints[:, k, 1], tf.float32)
 
         # recover from normalized coordinates to real world
-        x_real = (x - x1)* config.IMAGE_SHAPE[1]
-        y_real = (y - y1)* config.IMAGE_SHAPE[0]
+        x_real = (x - x1) * config.IMAGE_SHAPE[1]
+        y_real = (y - y1) * config.IMAGE_SHAPE[0]
         # transform the box size into feature map size
         x_real_map = tf.cast(x_real * scale_x+0.5, tf.int32)
         y_real_map= tf.cast(y_real*scale_y+0.5,tf.int32)
@@ -1455,17 +1489,25 @@ def _timedistributed_depthwise_conv_block(inputs, pointwise_conv_filters, stride
     but with each layer wrapped in a TimeDistributed layer,
     used to build the computation graph of the mask head of the FPN.
     """
-    # channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
+    channel_axis = 1 if K.image_data_format() == 'channels_first' else -1
 
     # Depthwise
     x = KL.TimeDistributed(
         KL.DepthwiseConv2D((3, 3), padding='same'), name='mrcnn_keypoint_mask_conv{}'.format(block_id))(inputs)
-    x = KL.TimeDistributed(BatchNorm(axis=3), name='mrcnn_keypoint_mask_bn{}'.format(block_id))(x, training=train_bn)
+    x = KL.TimeDistributed(
+        BatchNorm(axis=channel_axis),
+        name='mrcnn_keypoint_mask_bn{}'.format(block_id))(x, training=train_bn)
     x = KL.Activation(relu6, name='mrcnn_mask_conv_dw_{}_relu'.format(block_id))(x)
     # Pointwise
     x = KL.TimeDistributed(
-        KL.Conv2D(pointwise_conv_filters, (1, 1), padding='same'), name='mrcnn_keypoint_mask_conv_pw_{}'.format(block_id))(x)
-    x = KL.TimeDistributed(BatchNorm(axis=3), name='mrcnn_keypoint_mask_conv_pw_bn{}'.format(block_id))(x, training=train_bn)
+        KL.Conv2D(
+            pointwise_conv_filters,
+            (1, 1),
+            padding='same'),
+        name='mrcnn_keypoint_mask_conv_pw_{}'.format(block_id))(x)
+    x = KL.TimeDistributed(
+        BatchNorm(axis=channel_axis),
+        name='mrcnn_keypoint_mask_conv_pw_bn{}'.format(block_id))(x, training=train_bn)
     return KL.Activation(relu6, name='mrcnn_mask_conv_pw_relu{}'.format(block_id))(x)
 
 
@@ -1537,7 +1579,9 @@ def build_fpn_keypoint_graph(rois, feature_maps, image_shape, pool_size, num_key
     x = PyramidROIAlign(
         [pool_size, pool_size], image_shape, name="roi_align_keypoint_mask")([rois] + feature_maps)
 
-    for i in range(8):
+    # v1  = 8
+    # v2+ = 3
+    for i in range(3):
         x = KL.TimeDistributed(KL.Conv2D(512, (3, 3), padding="same"), name="mrcnn_keypoint_mask_conv{}".format(i + 1))(x)
         x = KL.TimeDistributed(BatchNorm(axis=3), name='mrcnn_keypoint_mask_bn{}'.format(i + 1))(x)
         x = KL.Activation('relu')(x)
@@ -1874,8 +1918,7 @@ def keypoint_mrcnn_mask_loss_graph(target_keypoints, target_keypoint_weights, ta
     if(config.WEIGHT_LOSS):
         loss = K.switch(tf.reduce_sum(positive_keypoint_weights) > 0,
                         lambda: tf.reduce_sum(loss) / tf.reduce_sum(positive_keypoint_weights),
-                        lambda: tf.constant(0.0)
-                        )
+                        lambda: tf.constant(0.0))
     else:
         loss = K.mean(loss)
     loss = tf.reshape(loss, [1, 1])
@@ -2764,13 +2807,10 @@ class MaskRCNN():
         elif config.BACKBONE in ['mobilenetv1']:
             _, C2, C3, C4, C5 = mobilenetv1_graph(input_image, config.BACKBONE, alpha=1.0)
         elif config.BACKBONE in ['mobilenetv2']:
-            _, C2, C3, C4, C5 = mobilenetv2_graph(input_image, config.BACKBONE, alpha=1.0)
+            _, C2, C3, C4 = mobilenetv2_graph(input_image, config.BACKBONE, alpha=1.0)
         # Top-down Layers
         # TODO: add assert to varify feature map sizes match what's in config
-        P5 = KL.Conv2D(256, (1, 1), name='fpn_c5p5')(C5)
-        P4 = KL.Add(name='fpn_p4add')([
-            KL.UpSampling2D(size=(2, 2), name='fpn_p5upsampled')(P5),
-            KL.Conv2D(256, (1, 1), name='fpn_c4p4')(C4)])
+        P4 = KL.Conv2D(256, (1, 1), name='fpn_c4p4')(C4)
         P3 = KL.Add(name='fpn_p3add')([
             KL.UpSampling2D(size=(2, 2), name='fpn_p4upsampled')(P4),
             KL.Conv2D(256, (1, 1), name='fpn_c3p3')(C3)])
@@ -2781,14 +2821,10 @@ class MaskRCNN():
         P2 = KL.Conv2D(256, (3, 3), padding='SAME', name='fpn_p2')(P2)
         P3 = KL.Conv2D(256, (3, 3), padding='SAME', name='fpn_p3')(P3)
         P4 = KL.Conv2D(256, (3, 3), padding='SAME', name='fpn_p4')(P4)
-        P5 = KL.Conv2D(256, (3, 3), padding='SAME', name='fpn_p5')(P5)
-        # P6 is used for the 5th anchor scale in RPN. Generated by
-        # subsampling from P5 with stride of 2.
-        P6 = KL.MaxPooling2D(pool_size=(1, 1), strides=2, name='fpn_p6')(P5)
 
         # Note that P6 is used in RPN, but not in the classifier heads.
-        rpn_feature_maps = [P2, P3, P4, P5, P6]
-        mrcnn_feature_maps = [P2, P3, P4, P5]
+        rpn_feature_maps = [P2, P3, P4]
+        mrcnn_feature_maps = [P2, P3, P4]
 
         # Generate Anchors
         self.anchors = utils.generate_pyramid_anchors(config.RPN_ANCHOR_SCALES,
@@ -3066,8 +3102,8 @@ class MaskRCNN():
             layer = self.keras_model.get_layer(name)
             if layer.output in self.keras_model.losses:
                 continue
-            self.keras_model.add_loss(
-                tf.reduce_mean(layer.output, keep_dims=True))
+            loss = (tf.reduce_mean(layer.output, keep_dims=True) * self.config.LOSS_WEIGHTS.get(name, 1.))
+            self.keras_model.add_loss(loss)
 
         # Add L2 Regularization
         # Skip gamma and beta weights of batch normalization layers.
@@ -3085,8 +3121,8 @@ class MaskRCNN():
                 continue
             layer = self.keras_model.get_layer(name)
             self.keras_model.metrics_names.append(name)
-            self.keras_model.metrics_tensors.append(tf.reduce_mean(
-                layer.output, keep_dims=True))
+            loss = (tf.reduce_mean(layer.output, keep_dims=True) * self.config.LOSS_WEIGHTS.get(name, 1.))
+            self.keras_model.metrics_tensors.append(loss)
 
     def set_trainable(self, layer_regex, keras_model=None, indent=0, verbose=1):
         """Sets model layers as trainable if their names match
@@ -3206,10 +3242,18 @@ class MaskRCNN():
             }
         elif self.config.BACKBONE in ['mobilenetv2']:
             # From a specific Mobilenetv2 stage and up
+            '''
             stage_regex = {
                 "3+": r"(conv.*6.*)|(conv.*7.*)|(conv.*8.*)|(conv.*9.*)|(conv.*10.*)|(conv.*11.*)|(conv.*12.*)|(conv.*13.*)|(conv.*14.*)|(conv.*15.*)|(conv.*16.*)|(conv.*17.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
                 "4+": r"(conv.*13.*)|(conv.*14.*)|(conv.*15.*)|(conv.*16.*)|(conv.*17.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
                 "5+": r"(conv.*17.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)"
+            }
+            '''
+
+            stage_regex = {
+                "3+": r"(conv.*7.*)|(conv.*8.*)|(conv.*9.*)|(conv.*10.*)|(conv.*11.*)|(conv.*12.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
+                "4+": r"(conv.*8.*)|(conv.*9.*)|(conv.*10.*)|(conv.*11.*)|(conv.*12.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)",
+                "5+": r"(conv.*12.*)|(mrcnn\_.*)|(rpn\_.*)|(fpn\_.*)"
             }
 
         layer_regex.update(stage_regex)
@@ -3247,6 +3291,7 @@ class MaskRCNN():
             train_generator,
             initial_epoch=self.epoch,
             epochs=epochs,
+            verbose=1,
             steps_per_epoch=self.config.STEPS_PER_EPOCH,
             callbacks=callbacks,
             validation_data=next(val_generator),
@@ -3465,7 +3510,15 @@ class MaskRCNN():
         assert len(images) == self.config.BATCH_SIZE, "len(images) must be equal to BATCH_SIZE"
 
         #self.keras_model.summary()
-        print(self.keras_model.count_params())
+        '''
+        tmp = 0
+        # self.keras_model.summary()
+
+        for i in range(150):
+            tmp += self.keras_model.layers[i].count_params()
+
+        print(tmp)
+        '''
 
         if verbose:
             log("Processing {} images".format(len(images)))
@@ -3593,6 +3646,7 @@ class MaskRCNN():
             # gt_keypoint_masks = model_inputs[6]
             # gt_keypoint_weights = model_inputs[7]
             model_in = model_inputs
+
             # if not config.USE_RPN_ROIS:
             #     model_in.append(target_rois)
             if model.uses_learning_phase and not isinstance(K.learning_phase(), int):

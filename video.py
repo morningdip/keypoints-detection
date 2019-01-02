@@ -5,15 +5,16 @@ import cv2
 import datetime
 import model as modellib
 import visualize
-import terminal_color as tc
 
 from config import Config
 from keras import backend as K
 from queue import Queue
 from threading import Thread
+from PIL import Image, ImageDraw, ImageFont
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # Root directory of the project
 ROOT_DIR = '../'
@@ -24,12 +25,14 @@ index = [0, 1]
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, "logs/{}_logs".format(fi_class_names[0]))
-model_path = os.path.join(ROOT_DIR, "model/mobilev2_mask_rcnn_{}_0300.h5".format(fi_class_names[0]))
+model_path = os.path.join(
+    ROOT_DIR, "model/mobilev2_mask_rcnn_finger_0900_v5.h5".format(fi_class_names[0]))
 
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
 class FPS:
+
     def __init__(self):
         # store the start time, end time, and total number of frames
         # that were examined between the start and end intervals
@@ -62,6 +65,7 @@ class FPS:
 
 
 class WebcamVideoStream:
+
     def __init__(self, src, width, height):
         # initialize the video camera stream and read the first frame
         # from the stream
@@ -150,42 +154,51 @@ def worker(input_q, output_q):
     null_image = np.zeros((1, 1, 3))
     model.detect_keypoint([null_image], verbose=0)
 
-    # fps = FPS().start()
+    fps = FPS().start()
     while True:
-        # fps.update()
+        fps.update()
         frame = input_q.get()
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        output_q.put((frame_rgb, model.detect_keypoint([frame_rgb], verbose=0)))
+        output_q.put(
+            (frame_rgb, model.detect_keypoint([frame_rgb], verbose=0)))
 
-    # fps.stop()
+    fps.stop()
     K.clear_session()
 
 
 if __name__ == '__main__':
+    cv2.namedWindow('demo', cv2.WINDOW_NORMAL)
+    cv2.resizeWindow('demo', 640, 480)
 
-    input_q = Queue(1)  # fps is better if queue is higher but then more lags
+    input_q = Queue(2)  # fps is better if queue is higher but then more lags
     output_q = Queue()
     for i in range(1):
         t = Thread(target=worker, args=(input_q, output_q))
         t.daemon = True
         t.start()
 
-    video_capture = WebcamVideoStream(src='http://140.115.54.125:8090/videostream.cgi?.mjpg',
-                                      width=640, height=480).start()
+    video_src = 'http://140.115.54.125:8090/videostream.cgi?.mjpg'
+
+    video_capture = WebcamVideoStream(
+        src=video_src, width=640, height=480).start()
 
     frame_num = 0
-    #fps = FPS().start()
+    fps = FPS().start()
 
     while True:
         frame = video_capture.read()
+        input_q.put(frame)
 
-        # t = time.time()
-
+        t = time.time()
+        '''
         if frame_num % 4 == 0:
-            frame_num = 0
+            #frame_num = 1
             input_q.put(frame)
         else:
+            print('pass')
             pass
+        '''
+        predicted_result = ''
 
         if output_q.empty():
             pass  # fill up queue
@@ -194,23 +207,37 @@ if __name__ == '__main__':
 
             r = data[0]
             start_time = time.time()
-            keypoints_image = visualize.get_keypoints_image(tmp, r['rois'], r['keypoints'], r['class_ids'], class_names)
+            keypoints_image, text = visualize.get_keypoints_image(
+                tmp, r['rois'], r['keypoints'], r['scores'])
+
+            if text:
+                predicted_result = text
             # end_time = time.time()
             # print('Each image spend: ', '{}'.format(end_time - start_time))
-            cv2.imshow('Demo', keypoints_image)
 
-        #frame_num += 1
+            img_pil = Image.fromarray(cv2.cvtColor(keypoints_image, cv2.COLOR_BGR2RGB))
+            font = ImageFont.truetype('NotoSansCJK-Medium.ttc', 26)
+            draw = ImageDraw.Draw(img_pil)
+            draw.text((40, 40), predicted_result, font=font, fill=(67, 67, 244))
+            img = cv2.cvtColor(np.asarray(img_pil), cv2.COLOR_RGB2BGR)
+            
+            #cv2.putText(keypoints_image, predicted_result, (10, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 1, cv2.LINE_AA)
 
-        # fps.update()
+
+            cv2.imshow('demo', img)
+
+        frame_num += 1
+
+        fps.update()
 
         #print('[INFO] elapsed time: {:.2f}'.format(time.time() - t))
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
-    #fps.stop()
-    #print('[INFO] elapsed time (total): {:.2f}'.format(fps.elapsed()))
-    #print('[INFO] approx. FPS: {:.2f}'.format(fps.fps()))
+    fps.stop()
+    print('[INFO] elapsed time (total): {:.2f}'.format(fps.elapsed()))
+    print('[INFO] approx. FPS: {:.2f}'.format(fps.fps()))
 
 video_capture.stop()
 cv2.destroyAllWindows()

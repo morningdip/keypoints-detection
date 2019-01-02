@@ -6,6 +6,8 @@ import utils
 import model as modellib
 import visualize
 import progressbar
+import matplotlib
+import matplotlib.pyplot as plt
 
 from config import Config
 from PIL import Image
@@ -27,7 +29,7 @@ index = [0, 1]
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, 'logs/{}_logs'.format(fi_class_names[0]))
-model_path = os.path.join(ROOT_DIR, 'model/mobilev2_mask_rcnn_finger_0600_v5.h5')
+model_path = os.path.join(ROOT_DIR, 'model/mobilev2_mask_rcnn_finger_0600_v3.h5')
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -64,7 +66,7 @@ class FingerConfig(Config):
 
     # RPN_TRAIN_ANCHORS_PER_IMAGE = 150
     RPN_TRAIN_ANCHORS_PER_IMAGE = 64
-    VALIDATION_STEPS = 100
+    VALIDATION_STPES = 100
     STEPS_PER_EPOCH = 100
     MINI_MASK_SHAPE = (56, 56)
     KEYPOINT_MASK_POOL_SIZE = 7
@@ -130,60 +132,40 @@ if __name__ == '__main__':
     print('Loading weights from ', model_path)
     model.load_weights(model_path, by_name=True)
 
-    null_image = np.zeros((1, 1, 3))
-    results = model.detect_keypoint([null_image], verbose=0)
+    # Last Backbone Layer
+    if inference_config.BACKBONE in ["resnet50", "resnet101"]:
+        laBaLa = "res4w_out"
+    if inference_config.BACKBONE in ["mobilenetv1"]:
+        laBaLa = "conv_pw_1_bn"
+    if inference_config.BACKBONE in ["mobilenetv2"]:
+        laBaLA = "conv_pw_1_bn"
 
-    detect_times = []
-
-    detect_time_format_text = progressbar.FormatCustomText(
-        ' %(detect_time).3f sec',
-        dict(
-            detect_time=0,
-        ),
-    )
-
-    widgets = [
-        progressbar.Percentage(),
-        detect_time_format_text,
-        ' (', progressbar.SimpleProgress(
-            format='%(value)02d/%(max_value)d'), ') ',
-        progressbar.AnimatedMarker(markers='.oO@* '),
-        ' ', progressbar.Bar(marker='>'), ' ', progressbar.ETA()]
-
-    pbar = progressbar.ProgressBar(
-        widgets=widgets,
-        max_value=dataset_test.num_images,
-        redirect_stdout=True)
-    pbar.start()
-
-    for index, x in enumerate(range(0, dataset_test.num_images)):
+    for index, x in enumerate(range(0, 2)):
         image = dataset_test.load_image(x)
-        category = dataset_test.image_info[x]['image_category']
-        image_id = dataset_test.image_info[x]['id']
-        image_name, image_ext = os.path.splitext(
-            os.path.basename(dataset_test.image_info[x]['id']))
+        image = np.expand_dims(image, axis=0)
+        #image = np.array(image).reshape(1, 640, 640, 3)
 
-        start_time = time.time()
-        results = model.detect_keypoint([image], verbose=0)
-        end_time = time.time()
+        # Get activations of a few sample layers
+        activations = model.run_graph([image], [
+            ("input_image", model.keras_model.get_layer("input_image").output),
+            ("conv3", model.keras_model.get_layer("conv3").output)],
+            TEST_MODE='inference')
 
-        detect_times.append(end_time - start_time)
+    # Backbone feature map
+    '''
+    NUM_LAYERS = 12
+    for i in range(NUM_LAYERS):
+        layer = "conv_pw_{}_bn".format(i+1)
+        BB_activations = model.run_graph([image], [(layer, model.keras_model.get_layer(layer).output)], TEST_MODE='inference')
+        print(BB_activations[layer].shape)
+        visualize.display_images(np.transpose(BB_activations[layer][0,:,:,:16], [2, 0, 1])*10000)
+    '''
 
-        r = results[0]
 
-        save_img_path = os.path.join(results_path, image_name + '.png')
+    layer = "res11"
+    activations = model.run_graph([image], [(layer, model.keras_model.get_layer(layer).output)], TEST_MODE='inference')
+    print(activations[layer].shape)
 
-        visualize.get_keypoints_trace(
-            image, save_img_path,
-            r['rois'], r['keypoints'])
-
-        detect_time_format_text.update_mapping(
-            detect_time=end_time - start_time)
-        pbar.update(index)
-
-    pbar.finish()
-
-    meam_time = np.mean(detect_times)
-    tcolor.printmc(('RED', 'Blue'), 'Mean FPS: ', '{}'.format(1 / meam_time))
+    visualize.display_images(np.transpose(activations[layer][0, :, :, :12], [2, 0, 1]))
 
     K.clear_session()

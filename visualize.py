@@ -16,6 +16,7 @@ from skimage.measure import find_contours
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.lines as lines
+import matplotlib.colors as colors
 from matplotlib.patches import Polygon
 import IPython.display
 import cv2
@@ -53,14 +54,17 @@ def display_images(images, titles=None, cols=4, cmap=None, norm=None,
     rows = len(images) // cols + 1
     plt.figure(figsize=(14, 14 * rows // cols))
     i = 1
+    #norm = colors.Normalize(vmin=0, vmax=255)
     for image, title in zip(images, titles):
         plt.subplot(rows, cols, i)
         plt.title(title, fontsize=9)
         plt.axis('off')
-        plt.imshow(image.astype(np.uint8), cmap=cmap,
+        plt.imshow(image, cmap=cmap,
                    norm=norm, interpolation=interpolation)
         i += 1
+    plt.savefig('result.png', bbox_inches='tight')
     plt.show()
+
 
 
 def random_colors(N, bright=True):
@@ -690,7 +694,7 @@ def display_weight_stats(model):
     display_table(table)
 
 
-def save_keypoints(image, savename, boxes, keypoints, class_ids, class_names, skeleton=None, scores=None, title="", figsize=(16, 16), ax=None):
+def save_keypoints(image, savename, boxes, keypoints, scores=None):
 
     result_image = image.astype(np.float32).copy()
     result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
@@ -702,11 +706,11 @@ def save_keypoints(image, savename, boxes, keypoints, class_ids, class_names, sk
     if not N:
         print('\n*** No keypoints to display *** \n')
     else:
-        assert boxes.shape[0] == keypoints.shape[0] == class_ids.shape[0]
+        assert boxes.shape[0] == keypoints.shape[0]
 
     for i in range(N):
         y1, x1, y2, x2 = boxes[i]
-        # cv2.rectangle(result_image, (x1, y1), (x2, y2), (244, 108, 4), 3)
+        cv2.rectangle(result_image, (x1, y1), (x2, y2), (244, 108, 4), 3)
 
         for idx, joint in enumerate(keypoints[i]):
             if(joint[2] != 0):
@@ -716,7 +720,7 @@ def save_keypoints(image, savename, boxes, keypoints, class_ids, class_names, sk
     cv2.imwrite('{}'.format(savename), result_image.astype(np.uint8))
 
 
-def save_fingertip_keypoint(image, savename, boxes, keypoints, class_ids, class_names, skeleton=None, scores=None, title="", figsize=(16, 16), ax=None):
+def save_fingertip_keypoint(image, savename, boxes, keypoints, scores=None):
 
     result_image = image.astype(np.float32).copy()
     result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
@@ -726,7 +730,7 @@ def save_fingertip_keypoint(image, savename, boxes, keypoints, class_ids, class_
     if not N:
         print('\n*** No keypoints to display *** \n')
     else:
-        assert boxes.shape[0] == keypoints.shape[0] == class_ids.shape[0]
+        assert boxes.shape[0] == keypoints.shape[0]
 
     for i in range(N):
         x, y, vis = keypoints[0][0]
@@ -735,32 +739,47 @@ def save_fingertip_keypoint(image, savename, boxes, keypoints, class_ids, class_
     cv2.imwrite('{}'.format(savename), result_image.astype(np.uint8))
 
 
-pts = deque(maxlen=50)
+pts = deque(maxlen=250)
 is_saved = 0
 frame_number = 0
 
+count = 0
+filecount = 0
 
-def get_keypoints_image(image, boxes, keypoints, class_ids, class_names, scores=None):
+x_coord = []
+y_coord = []
+
+result = ''
+
+
+def get_keypoints_image(image, boxes, keypoints, scores=None):
     result_image = image.astype(np.float32).copy()
     result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
 
+    #blank_image = np.zeros((image.shape[0], image.shape[1]), np.uint8)
+
     N = boxes.shape[0]
 
-    global is_saved, frame_number
+    global is_saved, frame_number, count, x_coord, y_coord, result
 
     if not N:
-        print('\n*** No keypoints to display *** \n')
-
+        #print('\n*** No keypoints to display *** \n')
+        count += 1
 
     for i in range(N):
         x, y, vis = keypoints[0][0]
+
+        if (scores < 0.9):
+            pass
+        else:
+            pts.appendleft((x, y))
+            x_coord.append(int(x))
+            y_coord.append(int(y))
 
         '''
         if frame_number % 4 == 0:
             pts.appendleft((x, y))
         '''
-
-        pts.appendleft((x, y))
 
         #frame_number = frame_number + 1
 
@@ -768,13 +787,43 @@ def get_keypoints_image(image, boxes, keypoints, class_ids, class_names, scores=
         if pts[i - 1] is None or pts[i] is None:
             continue
         # thickness = int(np.sqrt(64 / float(i + 1)) * 2.5)
-        thickness = 10
-        cv2.line(result_image, pts[i - 1], pts[i], (244, 108, 4), thickness)
+        cv2.line(result_image, pts[i - 1], pts[i], (244, 108, 4), 10)
 
-    return result_image.astype(np.uint8)
+    if count > 50 and x_coord and y_coord:
+        count = 0
+        '''
+        for i in range(1, len(pts)):
+            if pts[i - 1] is None or pts[i] is None:
+                continue
+            thickness = 10
+            cv2.line(blank_image, pts[i - 1], pts[i], 255, thickness)
+
+        cv2.imwrite('./{}.png'.format(filecount), blank_image)
+        print('\n*** Result image saved *** \n')
+
+        filecount += 1
+        '''
+
+        data = {}
+        data['options'] = 'enable_pre_space'
+        data['requests'] = [{'writing_guide': {'writing_area_width': 640, 'writing_area_height': 480}, 'ink': [[]], 'language': 'zh_TW'}]
+
+        data['requests'][0]['ink'] = [[x_coord, y_coord]]
+        url = 'https://www.google.com/inputtools/request?ime=handwriting'
+        response = requests.post(url, json=data)
+        tmp = response.json()
+        result = tmp[1][0][1][0]
+
+        print(result)
+
+        pts.clear()
+        x_coord.clear()
+        y_coord.clear()
+
+    return result_image.astype(np.uint8), result
 
 
-def get_keypoints_trace(image, savename, boxes, keypoints, class_ids, class_names, skeleton=None, scores=None, title="", figsize=(16, 16), ax=None):
+def get_keypoints_trace(image, savename, boxes, keypoints, scores=None):
     result_image = image.astype(np.float32).copy()
     result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
 
@@ -785,7 +834,7 @@ def get_keypoints_trace(image, savename, boxes, keypoints, class_ids, class_name
     if not N:
         print('\n*** No keypoints to display *** \n')
     else:
-        assert boxes.shape[0] == keypoints.shape[0] == class_ids.shape[0]
+        assert boxes.shape[0] == keypoints.shape[0]
 
     for i in range(N):
         x, y, vis = keypoints[0][0]
