@@ -9,7 +9,7 @@ import utils
 from PIL import Image
 from keras.backend.tensorflow_backend import set_session
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 gpu_options = tf.GPUOptions(allow_growth=True)
@@ -44,7 +44,7 @@ class FingerConfig(Config):
     # handle 2 images of 1024x1024px.
     # Adjust based on your GPU memory and image sizes. Use the highest
     # number that your GPU can handle for best performance.
-    IMAGES_PER_GPU = 4
+    IMAGES_PER_GPU = 1
 
     # Number of training steps per epoch
     STEPS_PER_EPOCH = 1000
@@ -64,7 +64,8 @@ class FingerConfig(Config):
     NUM_KEYPOINTS = len(index)
 
     # Length of square anchor side in pixels
-    RPN_ANCHOR_SCALES = (20, 40, 80, 160, 320)
+    #RPN_ANCHOR_SCALES = (20, 40, 80, 160, 320)
+    RPN_ANCHOR_SCALES = (10, 20, 40, 80, 160)
 
     # Ratios of anchors at each cell (width/height)
     RPN_ANCHOR_RATIOS = [0.5, 1, 2]
@@ -84,8 +85,8 @@ class FingerConfig(Config):
     MASK_POOL_SIZE = 14
     MASK_SHAPE = [28, 28]
 
-    IMAGE_MIN_DIM = 480
-    IMAGE_MAX_DIM = 640
+    IMAGE_MIN_DIM = 240
+    IMAGE_MAX_DIM = 320
 
     # Number of ROIs per image to feed to classifier/mask heads
     # The Mask RCNN paper uses 512 but often the RPN doesn't generate
@@ -127,8 +128,8 @@ class FingerDataset(utils.Dataset):
             self.add_class('finger', i + 1, class_name)
 
         if category == 'train':
-            data_path = '../data/train/'
-            annotations = pd.read_csv('../data/train/annotations/train.csv')
+            data_path = '../data/train320/'
+            annotations = pd.read_csv('../data/train320/annotations/train.csv')
             '''
             annotations = annotations.append(
                 pd.read_csv('../data/train/annotations/data_scaling.csv'), ignore_index=True)
@@ -136,8 +137,8 @@ class FingerDataset(utils.Dataset):
                 pd.read_csv('../data/train/annotations/data_flip.csv'), ignore_index=True)
             '''
         elif category == 'val':
-            data_path = '../data/val/'
-            annotations = pd.read_csv('../data/val/annotations/val.csv')
+            data_path = '../data/val320/'
+            annotations = pd.read_csv('../data/val320/annotations/val.csv')
         else:
             pass
 
@@ -239,6 +240,7 @@ if __name__ == '__main__':
     model = modellib.MaskRCNN(
         mode='training', config=config, model_dir=MODEL_DIR)
 
+    '''
     # Which weights to start with?
     init_with = 'self_mdoel'    # imagenet, coco, or last
     if init_with == 'coco':
@@ -252,6 +254,7 @@ if __name__ == '__main__':
         model.load_weights(model.find_last()[1], by_name=True)
     elif init_with == 'self_mdoel':
         model.load_weights(SELF_MODEL_PATH, by_name=True)
+    '''
 
     print('Train all')
     model.train(dataset_train, dataset_val,

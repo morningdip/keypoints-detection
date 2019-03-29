@@ -10,6 +10,7 @@ from keras import backend as K
 from queue import Queue
 from threading import Thread
 from utils import FPS, WebcamVideoStream
+from PIL import Image, ImageDraw, ImageFont
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
@@ -95,6 +96,9 @@ def worker(input_q, output_q):
 
 
 if __name__ == '__main__':
+
+    font = ImageFont.truetype('../font/candy-gothic.ttf', 50)
+
     cv2.namedWindow('demo', cv2.WINDOW_NORMAL)
     cv2.resizeWindow('demo', 640, 480)
 
@@ -114,6 +118,7 @@ if __name__ == '__main__':
 
     while True:
         frame = video_capture.read()
+        predicted_result = ''
         input_q.put(frame)
 
         t = time.time()
@@ -122,12 +127,26 @@ if __name__ == '__main__':
             pass
         else:
             img, data = output_q.get()
-            img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
             r = data[0]
 
             if frame_num % 2 == 0:
-                img = visualize.get_keypoint_skip(img, r['rois'], r['keypoints'], r['scores'])
+                img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
+                img, text = visualize.get_keypoint_text(img, r['rois'], r['keypoints'], r['scores'])
+
+                if text:
+                    predicted_result = text
+
+                img_pil = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+                draw = ImageDraw.Draw(img_pil)
+
+                msg = predicted_result
+                w, h = draw.textsize(msg, font=font)
+
+                draw.rectangle(((0, 0), (640, h + 5)), fill=(53, 58, 67))
+                draw.text(((640 - w) / 2, 0), msg, font=font, fill=(227, 229, 233))
+                img = cv2.cvtColor(np.asarray(img_pil), cv2.COLOR_RGB2BGR)
+
                 cv2.imshow('demo', img)
             else:
                 pass

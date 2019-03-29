@@ -17,11 +17,14 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 import matplotlib.lines as lines
 import matplotlib.colors as colors
+import json
 from matplotlib.patches import Polygon
 import IPython.display
 import cv2
 import utils
 from collections import deque
+import requests
+import pusher
 
 
 ############################################################
@@ -51,20 +54,20 @@ def display_images(images, titles=None, cols=4, cmap=None, norm=None,
     interpolation: Optional. Image interporlation to use for display.
     """
     titles = titles if titles is not None else [""] * len(images)
-    rows = len(images) // cols + 1
-    plt.figure(figsize=(14, 14 * rows // cols))
+
     i = 1
-    #norm = colors.Normalize(vmin=0, vmax=255)
+
+    # norm = colors.Normalize(vmin= -5, vmax=5)
     for image, title in zip(images, titles):
-        plt.subplot(rows, cols, i)
+        #plt.subplot(4, 4, i)
         plt.title(title, fontsize=9)
         plt.axis('off')
-        plt.imshow(image, cmap=cmap,
-                   norm=norm, interpolation=interpolation)
+        fig = plt.imshow(image, cmap='binary', norm=norm, interpolation=interpolation, aspect='equal')
         i += 1
-    plt.savefig('result.png', bbox_inches='tight')
+        fig.axes.get_xaxis().set_visible(False)
+        fig.axes.get_yaxis().set_visible(False)
+        plt.savefig('result.png', bbox_inches='tight', pad_inches=0)
     plt.show()
-
 
 
 def random_colors(N, bright=True):
@@ -740,87 +743,95 @@ def save_fingertip_keypoint(image, savename, boxes, keypoints, scores=None):
 
 
 pts = deque(maxlen=250)
-is_saved = 0
-frame_number = 0
 
-count = 0
-filecount = 0
+frame_number = 0
+is_suspend = 0
+
+skip = 0
 
 x_coord = []
 y_coord = []
 
 result = ''
+api_key = 'AIzaSyDrsKNbDpQBuU_5gm8hB5gzdtNnay4GHLY'
+#push_service = FCMNotification(api_key=api_key)
+
+pusher_client = pusher.Pusher(
+  app_id='697651',
+  key='c05e0a06a7fafc209796',
+  secret='4b51ae41bba9121b9ec6',
+  cluster='ap3',
+  ssl=True
+)
 
 
-def get_keypoints_image(image, boxes, keypoints, scores=None):
-    result_image = image.astype(np.float32).copy()
-    result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
-
-    #blank_image = np.zeros((image.shape[0], image.shape[1]), np.uint8)
-
+def get_keypoints_image(result_image, boxes, keypoints, scores=None):
+    #result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
+    global x_coord, y_coord, result, is_suspend
     N = boxes.shape[0]
 
-    global is_saved, frame_number, count, x_coord, y_coord, result
-
+    '''
     if not N:
-        #print('\n*** No keypoints to display *** \n')
-        count += 1
+        # No keypoints
+        skip += 1
+    '''
 
     for i in range(N):
         x, y, vis = keypoints[0][0]
 
-        if (scores < 0.9):
+        if (scores < 0.96):
             pass
         else:
-            pts.appendleft((x, y))
+            print(scores)
             x_coord.append(int(x))
             y_coord.append(int(y))
 
-        '''
-        if frame_number % 4 == 0:
-            pts.appendleft((x, y))
-        '''
-
-        #frame_number = frame_number + 1
-
-    for i in range(1, len(pts)):
-        if pts[i - 1] is None or pts[i] is None:
+    for i in range(1, len(x_coord)):
+        if x_coord[i - 1] is None or x_coord[i] is None:
             continue
-        # thickness = int(np.sqrt(64 / float(i + 1)) * 2.5)
-        cv2.line(result_image, pts[i - 1], pts[i], (244, 108, 4), 10)
+        cv2.line(result_image, (x_coord[i - 1], y_coord[i - 1]), (x_coord[i], y_coord[i]), (244, 108, 4), 10)
 
-    if count > 50 and x_coord and y_coord:
-        count = 0
-        '''
-        for i in range(1, len(pts)):
-            if pts[i - 1] is None or pts[i] is None:
-                continue
-            thickness = 10
-            cv2.line(blank_image, pts[i - 1], pts[i], 255, thickness)
+    # STAY VERSION
+    ENDURE_PIXEL = 5
+    LAST_COORD_NUM = 10
 
-        cv2.imwrite('./{}.png'.format(filecount), blank_image)
-        print('\n*** Result image saved *** \n')
+    if len(x_coord) > LAST_COORD_NUM:
 
-        filecount += 1
-        '''
+        avg_last_xcoord = sum(x_coord[-LAST_COORD_NUM:]) / LAST_COORD_NUM
+        avg_last_ycoord = sum(y_coord[-LAST_COORD_NUM:]) / LAST_COORD_NUM
+
+        if abs(int(avg_last_xcoord) - int(x_coord[-1])) < ENDURE_PIXEL and abs(int(avg_last_ycoord) - int(y_coord[-1])) < ENDURE_PIXEL:
+            is_suspend = is_suspend + 1
+        else:
+            is_suspend = max(is_suspend - 1, 0)
+
+    # Send predicted words to android device via firebase cloud message
+    if is_suspend > 3 and x_coord and y_coord:
+        is_suspend = 0
 
         data = {}
         data['options'] = 'enable_pre_space'
         data['requests'] = [{'writing_guide': {'writing_area_width': 640, 'writing_area_height': 480}, 'ink': [[]], 'language': 'zh_TW'}]
-
         data['requests'][0]['ink'] = [[x_coord, y_coord]]
+
         url = 'https://www.google.com/inputtools/request?ime=handwriting'
         response = requests.post(url, json=data)
         tmp = response.json()
+        print(tmp[1][0][1][:])
         result = tmp[1][0][1][0]
 
-        print(result)
+        str = ''
 
-        pts.clear()
+        print(str.join(tmp[1][0][1][:10]))
+
+        print(result)
+        pusher_client.trigger('my-channel', 'my-event', {'message': str.join(tmp[1][0][1][:10])})
+        #push_service.notify_topic_subscribers(topic_name='fingertip', message_body=str.join(tmp[1][0][1][:5]))
+
         x_coord.clear()
         y_coord.clear()
 
-    return result_image.astype(np.uint8), result
+    return result_image.astype(np.uint8)
 
 
 def get_keypoints_trace(image, savename, boxes, keypoints, scores=None):
@@ -829,7 +840,7 @@ def get_keypoints_trace(image, savename, boxes, keypoints, scores=None):
 
     N = boxes.shape[0]
 
-    global is_saved, frame_number
+    global frame_number
 
     if not N:
         print('\n*** No keypoints to display *** \n')
@@ -852,3 +863,146 @@ def get_keypoints_trace(image, savename, boxes, keypoints, scores=None):
         cv2.line(result_image, pts[i - 1], pts[i], (244, 108, 4), thickness)
 
     cv2.imwrite('{}'.format(savename), result_image.astype(np.uint8))
+
+
+def save_label(image, savename, boxes, keypoints, scores=None):
+    image_name, _ext = os.path.splitext(savename)
+    label_name = image_name + '.json'
+    #file = open(label_name, 'w', encoding='utf-8')
+    #ft_x, ft_y, j_x, j_y
+
+    result_image = image.astype(np.float32).copy()
+    result_image = cv2.cvtColor(result_image, cv2.COLOR_RGB2BGR)
+    src_image = image.astype(np.float32).copy()
+    src_image = cv2.cvtColor(src_image, cv2.COLOR_RGB2BGR)
+
+    color = [(244, 108, 4), (67, 67, 244), (8, 228, 252)]
+    N = boxes.shape[0]
+
+    if not N:
+        print('\n*** No keypoints to display *** \n')
+    else:
+        assert boxes.shape[0] == keypoints.shape[0]
+
+    for i in range(N):
+        for idx, joint in enumerate(keypoints[i]):
+            if(joint[2] != 0):
+                cv2.circle(result_image, (joint[0], joint[1]), 15, color[idx], -1)
+
+    if N:
+        json_file =  open(label_name, 'w')
+        a, b = keypoints[0]
+
+        data = {
+            'name' : savename.split('/')[-1],
+            'fingertip' : '{}_{}'.format(a[0], a[1]),
+            'joint' : '{}_{}'.format(b[0], b[1])
+        }
+
+        json.dump(data, json_file)
+        cv2.imwrite('{}_label.png'.format(image_name), result_image.astype(np.uint8))
+        cv2.imwrite('{}'.format(savename), src_image.astype(np.uint8))
+
+
+def get_keypoint_skip(result_image, boxes, keypoints, scores=None):
+    global skip
+    N = boxes.shape[0]
+
+    # No keypoints in image
+    if not N:
+        skip += 1
+
+    # Filter the keypoints by its score
+    for i in range(N):
+        x, y, vis = keypoints[0][0]
+
+        if (scores < 0.96):
+            skip += 1
+
+        else:
+            skip = 0
+            x_coord.append(int(x))
+            y_coord.append(int(y))
+
+    # Draw the fingertip trace
+    for i in range(1, len(x_coord)):
+        if x_coord[i - 1] is None or x_coord[i] is None:
+            continue
+        cv2.line(result_image, (x_coord[i - 1], y_coord[i - 1]), (x_coord[i], y_coord[i]), (244, 108, 4), 10)
+
+    # Send predicted words to android device via firebase cloud message
+    if skip > 10 and x_coord and y_coord:
+        skip = 0
+
+        data = {}
+        data['options'] = 'enable_pre_space'
+        data['requests'] = [{
+            'writing_guide': {'writing_area_width': 640, 'writing_area_height': 480},
+            'ink': [[x_coord, y_coord]],
+            'language': 'zh_TW'
+        }]
+
+        url = 'https://www.google.com/inputtools/request?ime=handwriting'
+        response = requests.post(url, json=data).json()
+
+        print(response[1][0][1][:10])
+
+        response = ''.join(response[1][0][1][:10])
+        pusher_client.trigger('my-channel', 'my-event', {'message': response})
+
+        x_coord.clear()
+        y_coord.clear()
+
+    return result_image.astype(np.uint8)
+
+response = ''
+
+def get_keypoint_text(result_image, boxes, keypoints, scores=None):
+    global skip, response
+    N = boxes.shape[0]
+
+    # No keypoints in image
+    if not N:
+        skip += 1
+
+    # Filter the keypoints by its score
+    for i in range(N):
+        x, y, vis = keypoints[0][0]
+
+        if (scores < 0.96):
+            skip += 1
+
+        else:
+            skip = 0
+            x_coord.append(int(x))
+            y_coord.append(int(y))
+
+    # Draw the fingertip trace
+    for i in range(1, len(x_coord)):
+        if x_coord[i - 1] is None or x_coord[i] is None:
+            continue
+        cv2.line(result_image, (x_coord[i - 1], y_coord[i - 1]), (x_coord[i], y_coord[i]), (244, 108, 4), 10)
+
+    # Send predicted words to android device via firebase cloud message
+    if skip > 10 and x_coord and y_coord:
+        skip = 0
+
+        data = {}
+        data['options'] = 'enable_pre_space'
+        data['requests'] = [{
+            'writing_guide': {'writing_area_width': 640, 'writing_area_height': 480},
+            'ink': [[x_coord, y_coord]],
+            'language': 'zh_TW'
+        }]
+
+        url = 'https://www.google.com/inputtools/request?ime=handwriting'
+        response = requests.post(url, json=data).json()
+
+        print(response[1][0][1][:9])
+
+        response = ' '.join(response[1][0][1][:9])
+
+        x_coord.clear()
+        y_coord.clear()
+
+    return result_image.astype(np.uint8), response

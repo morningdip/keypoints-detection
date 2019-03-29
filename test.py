@@ -15,7 +15,7 @@ from keras import backend as K
 import terminal_color as tc
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
 # Root directory of the project
@@ -27,7 +27,7 @@ index = [0, 1]
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, 'logs/{}_logs'.format(fi_class_names[0]))
-model_path = os.path.join(ROOT_DIR, 'model/mobilev2_mask_rcnn_finger_0600_v5.h5')
+model_path = os.path.join(ROOT_DIR, 'model/mobilev2_mask_rcnn_finger_0900_v5.h5')
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -57,10 +57,16 @@ class FingerConfig(Config):
 
     BACKBONE = 'mobilenetv2'
 
+
     IMAGE_MIN_DIM = 480
     IMAGE_MAX_DIM = 640
+    '''
+    IMAGE_MIN_DIM = 240
+    IMAGE_MAX_DIM = 320
+    '''
 
     RPN_ANCHOR_SCALES = (20, 40, 80, 160, 320)
+    #RPN_ANCHOR_SCALES = (10, 20, 40, 80, 160)
 
     # RPN_TRAIN_ANCHORS_PER_IMAGE = 150
     RPN_TRAIN_ANCHORS_PER_IMAGE = 64
@@ -87,7 +93,7 @@ class FingerConfig(Config):
 class FingerTestDataset(utils.Dataset):
 
     def load_finger_test(self):
-        test_data_path = '../data/test2'
+        test_data_path = '../data/test'
         # Add classes
         for i, class_name in enumerate(fi_class_names):
             self.add_class('finger', i + 1, class_name)
@@ -173,7 +179,7 @@ if __name__ == '__main__':
 
         save_img_path = os.path.join(results_path, image_name + '.png')
 
-        visualize.get_keypoints_trace(
+        visualize.save_label(
             image, save_img_path,
             r['rois'], r['keypoints'])
 

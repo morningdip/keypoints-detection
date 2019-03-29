@@ -1,20 +1,12 @@
 import os
-import time
 import numpy as np
 import pandas as pd
 import utils
 import model as modellib
 import visualize
-import progressbar
-import matplotlib
-import matplotlib.pyplot as plt
-
 from config import Config
 from PIL import Image
 from keras import backend as K
-
-
-import terminal_color as tc
 
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '1'
@@ -29,7 +21,8 @@ index = [0, 1]
 
 # Directory to save logs and trained model
 MODEL_DIR = os.path.join(ROOT_DIR, 'logs/{}_logs'.format(fi_class_names[0]))
-model_path = os.path.join(ROOT_DIR, 'model/mobilev2_mask_rcnn_finger_0600_v3.h5')
+model_path = os.path.join(
+    ROOT_DIR, 'model/test.h5')
 results_path = os.path.join(ROOT_DIR, 'results')
 
 
@@ -87,15 +80,16 @@ class FingerConfig(Config):
 
 
 class FingerTestDataset(utils.Dataset):
-
     def load_finger_test(self):
-        test_data_path = '../data/test2'
+        test_data_path = '../data/paper'
         # Add classes
         for i, class_name in enumerate(fi_class_names):
             self.add_class('finger', i + 1, class_name)
         # annotations = pd.read_csv('../data/test2/annotations/test.csv')
-        annotations = pd.read_csv(os.path.join(test_data_path, 'annotations', 'test.csv'))
-        annotations = annotations.loc[annotations['image_category'] == fi_class_names[0]]
+        annotations = pd.read_csv(os.path.join(
+            test_data_path, 'annotations', 'test.csv'))
+        annotations = annotations.loc[annotations[
+            'image_category'] == fi_class_names[0]]
         annotations = annotations.reset_index(drop=True)
 
         for x in range(annotations.shape[0]):
@@ -114,7 +108,6 @@ class FingerTestDataset(utils.Dataset):
 
 
 if __name__ == '__main__':
-    tcolor = tc.TerminalColor()
     dataset_test = FingerTestDataset()
     dataset_test.load_finger_test()
     dataset_test.prepare()
@@ -140,16 +133,22 @@ if __name__ == '__main__':
     if inference_config.BACKBONE in ["mobilenetv2"]:
         laBaLA = "conv_pw_1_bn"
 
-    for index, x in enumerate(range(0, 2)):
+    for index, x in enumerate(range(0, dataset_test.num_images)):
         image = dataset_test.load_image(x)
         image = np.expand_dims(image, axis=0)
-        #image = np.array(image).reshape(1, 640, 640, 3)
 
         # Get activations of a few sample layers
         activations = model.run_graph([image], [
             ("input_image", model.keras_model.get_layer("input_image").output),
-            ("conv3", model.keras_model.get_layer("conv3").output)],
+            ("conv9", model.keras_model.get_layer("conv9").output)],
             TEST_MODE='inference')
+
+        layer = "conv9"
+        activations = model.run_graph([image], [(layer, model.keras_model.get_layer(layer).output)], TEST_MODE='inference')
+        print(activations[layer].shape)
+
+        # visualize.display_images(np.transpose(activations[layer][0, :, :, :12], [2, 0, 1]))
+        visualize.display_images(np.transpose(activations[layer][0, :, :, :16], [2, 0, 1]))
 
     # Backbone feature map
     '''
@@ -160,12 +159,6 @@ if __name__ == '__main__':
         print(BB_activations[layer].shape)
         visualize.display_images(np.transpose(BB_activations[layer][0,:,:,:16], [2, 0, 1])*10000)
     '''
-
-
-    layer = "res11"
-    activations = model.run_graph([image], [(layer, model.keras_model.get_layer(layer).output)], TEST_MODE='inference')
-    print(activations[layer].shape)
-
-    visualize.display_images(np.transpose(activations[layer][0, :, :, :12], [2, 0, 1]))
+    #save_img_path = os.path.join(results_path, image_name + '.png')
 
     K.clear_session()

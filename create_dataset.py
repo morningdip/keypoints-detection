@@ -6,11 +6,13 @@ import argparse
 from natsort import natsorted
 from progressbar import AnimatedMarker, Bar, ETA, Percentage, SimpleProgress, ProgressBar
 
-widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ', AnimatedMarker(markers='.oO@* '), ' ', Bar(marker='>'), ' ', ETA()]
+widgets = [Percentage(), ' (', SimpleProgress(format='%(value)02d/%(max_value)d'), ') ',
+           AnimatedMarker(markers='.oO@* '), ' ', Bar(marker='>'), ' ', ETA()]
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Create the annotations file for dataset.')
+    parser = argparse.ArgumentParser(
+        description='Create the annotations file for dataset.')
     parser.add_argument(
         '--type',
         '-t',
@@ -42,9 +44,9 @@ def run():
     if type_dataset == 'test':
         test_dataset(name)
     elif type_dataset == 'train':
-        trainval_dataset(type_dataset)
+        trainval_dataset(name)
     elif type_dataset == 'val':
-        trainval_dataset(type_dataset)
+        trainval_dataset(name)
 
 
 def test_dataset(name):
@@ -83,7 +85,8 @@ def trainval_dataset(type_dataset):
         writer = csv.DictWriter(csvfile, fieldnames=field_names)
         writer.writeheader()
 
-        pbar = ProgressBar(widgets=widgets, max_value=len(txt_files), redirect_stdout=True)
+        pbar = ProgressBar(widgets=widgets, max_value=len(
+            txt_files), redirect_stdout=True)
         pbar.start()
 
         for idx, label_file in enumerate(txt_files):
@@ -100,8 +103,10 @@ def trainval_dataset(type_dataset):
                     print('Error! Line: {} in File: {}'.format(idx2, label_file))
                     break
 
-                fingertip = '_'.join(map(str, (int(fingertip_x * IMG_WIDTH), int(fingertip_y * IMG_HEIGHT), 2)))
-                joint = '_'.join(map(str, (int(joint_x * IMG_WIDTH), int(joint_y * IMG_HEIGHT), 2)))
+                fingertip = '_'.join(
+                    map(str, (int(fingertip_x * IMG_WIDTH), int(fingertip_y * IMG_HEIGHT), 2)))
+                joint = '_'.join(
+                    map(str, (int(joint_x * IMG_WIDTH), int(joint_y * IMG_HEIGHT), 2)))
 
                 writer.writerow({'image_id': 'images/' + img_name,
                                  'image_category': 'finger',
