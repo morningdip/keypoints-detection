@@ -753,8 +753,6 @@ x_coord = []
 y_coord = []
 
 result = ''
-api_key = 'AIzaSyDrsKNbDpQBuU_5gm8hB5gzdtNnay4GHLY'
-#push_service = FCMNotification(api_key=api_key)
 
 pusher_client = pusher.Pusher(
   app_id='697651',
